@@ -22,6 +22,7 @@ Bookarr is configured with environment variables.
 | Variable | Purpose |
 | --- | --- |
 | `BOOKARR_SECRET_KEY` | Secret used for signed login cookies. Use a long random value. |
+| `BOOKARR_VERSION` | Version label shown in the site banner. Default: `0.1`. |
 | `BOOKARR_REQUESTER_PASSWORD` | Shared password for normal requesters. |
 | `BOOKARR_ADMIN_PASSWORD` | Shared password for admins. |
 | `BOOKARR_DATABASE_URL` | Database URL. Docker default is `sqlite:////data/bookarr.db`. |

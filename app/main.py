@@ -56,6 +56,7 @@ def render(request: Request, template: str, **context):
         template,
         {
             "app_name": settings.app_name,
+            "app_version": settings.app_version,
             "user": current_user(request),
             **context,
         },

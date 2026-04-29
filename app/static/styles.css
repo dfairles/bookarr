@@ -76,6 +76,26 @@ nav a:hover,
   color: var(--text);
 }
 
+.site-banner {
+  align-items: center;
+  background: linear-gradient(90deg, rgba(47, 191, 143, 0.16), rgba(96, 165, 250, 0.1));
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px clamp(16px, 5vw, 44px);
+}
+
+.version {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 main {
   margin: 0 auto;
   max-width: 1120px;
@@ -339,6 +359,7 @@ button,
   }
 
   .topbar,
+  .site-banner,
   .page-head,
   .request-card {
     align-items: flex-start;

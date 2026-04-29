@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Bookarr"
+    app_version: str = Field(default="0.1", validation_alias="BOOKARR_VERSION")
     secret_key: str = Field(default="change-me", validation_alias="BOOKARR_SECRET_KEY")
     requester_password: str = Field(default="requester", validation_alias="BOOKARR_REQUESTER_PASSWORD")
     admin_password: str = Field(default="admin", validation_alias="BOOKARR_ADMIN_PASSWORD")
