@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import unquote
 
 import httpx
 
@@ -70,17 +71,90 @@ class ListenarrClient:
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self.base_url}{path if path.startswith('/') else '/' + path}"
         kwargs["params"] = self._params(kwargs.get("params"))
+        headers = self._headers()
         try:
             async with httpx.AsyncClient(timeout=20) as client:
-                response = await client.request(method, url, headers=self._headers(), **kwargs)
+                if method.upper() == "POST":
+                    headers["X-XSRF-TOKEN"] = await self._antiforgery_token(client)
+                response = await client.request(method, url, headers=headers, **kwargs)
                 response.raise_for_status()
                 if not response.content:
                     return {}
-                return response.json()
+                try:
+                    return response.json()
+                except ValueError as exc:
+                    raise ListenarrError("Listenarr returned a non-JSON response") from exc
         except httpx.HTTPStatusError as exc:
-            raise ListenarrError(f"Listenarr returned {exc.response.status_code}") from exc
-        except (httpx.HTTPError, ValueError) as exc:
-            raise ListenarrError("Could not reach Listenarr") from exc
+            body = exc.response.text[:1000]
+            raise ListenarrError(
+                f"Listenarr returned {exc.response.status_code}: {body}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise ListenarrError(f"Could not reach Listenarr: {exc}") from exc
+
+    async def _antiforgery_token(self, client: httpx.AsyncClient) -> str:
+        path = self.settings.listenarr_antiforgery_path
+        url = f"{self.base_url}{path if path.startswith('/') else '/' + path}"
+        response = await client.get(url, headers=self._headers(), params=self._params())
+        response.raise_for_status()
+        token = self._extract_antiforgery_token(response)
+        if not token:
+            content_type = response.headers.get("content-type", "unknown")
+            raise ListenarrError(
+                f"Listenarr did not return an antiforgery token from {path} "
+                f"(content-type: {content_type})"
+            )
+        return token
+
+    def _extract_antiforgery_token(self, response: httpx.Response) -> str:
+        body_token = self._extract_antiforgery_body_token(response)
+        if body_token:
+            return body_token
+        for name in ("X-XSRF-TOKEN", "XSRF-TOKEN", "X-CSRF-TOKEN", "RequestVerificationToken"):
+            token = self._clean_header_token(response.headers.get(name, ""))
+            if token:
+                return token
+        for name in ("XSRF-TOKEN", "X-XSRF-TOKEN", "CSRF-TOKEN", "ANTIFORGERY-TOKEN"):
+            token = self._clean_header_token(response.cookies.get(name, ""))
+            if token:
+                return token
+        for name, token in response.cookies.items():
+            if any(part in name.lower() for part in ("xsrf", "csrf", "antiforgery")):
+                clean_token = self._clean_header_token(token)
+                if clean_token:
+                    return clean_token
+        return ""
+
+    def _extract_antiforgery_body_token(self, response: httpx.Response) -> str:
+        if not response.content:
+            return ""
+        try:
+            payload = response.json()
+        except ValueError:
+            return self._clean_header_token(response.text)
+        if isinstance(payload, str):
+            return self._clean_header_token(payload)
+        if isinstance(payload, dict):
+            return self._clean_header_token(
+                self._first_value(
+                    payload,
+                    [
+                        "token",
+                        "xsrfToken",
+                        "csrfToken",
+                        "antiForgeryToken",
+                        "antiforgeryToken",
+                        "requestToken",
+                    ],
+                )
+            )
+        return ""
+
+    def _clean_header_token(self, value: Any) -> str:
+        token = unquote(str(value or "").strip().strip('"'))
+        if not token or any(char in token for char in "\r\n<>"):
+            return ""
+        return token
 
     def _normalize_result(self, item: dict[str, Any]) -> dict[str, str]:
         data = item.get("metadata") if isinstance(item.get("metadata"), dict) else item

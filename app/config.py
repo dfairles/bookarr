@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     listenarr_search_query_param: str = Field(default="query", validation_alias="LISTENARR_SEARCH_QUERY_PARAM")
     listenarr_search_region: str = Field(default="us", validation_alias="LISTENARR_SEARCH_REGION")
     listenarr_request_path: str = Field(default="/api/v1/library/add", validation_alias="LISTENARR_REQUEST_PATH")
+    listenarr_antiforgery_path: str = Field(
+        default="/api/v1/antiforgery/token",
+        validation_alias="LISTENARR_ANTIFORGERY_PATH",
+    )
     listenarr_status_path: str = Field(default="/api/v1/library/{listenarr_id}", validation_alias="LISTENARR_STATUS_PATH")
     status_poll_seconds: int = Field(default=300, validation_alias="BOOKARR_STATUS_POLL_SECONDS")
 

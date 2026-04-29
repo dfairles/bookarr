@@ -33,6 +33,7 @@ Bookarr is configured with environment variables.
 | `LISTENARR_SEARCH_QUERY_PARAM` | Search query parameter name. Default: `query`. |
 | `LISTENARR_SEARCH_REGION` | Listenarr metadata/search region. Default: `us`. |
 | `LISTENARR_REQUEST_PATH` | Request endpoint path. Default: `/api/v1/library/add`. |
+| `LISTENARR_ANTIFORGERY_PATH` | Antiforgery token endpoint path. Default: `/api/v1/antiforgery/token`. |
 | `LISTENARR_STATUS_PATH` | Status endpoint path. Use `{listenarr_id}` as the placeholder. |
 | `BOOKARR_STATUS_POLL_SECONDS` | How often Bookarr checks Listenarr for status updates. |
 
