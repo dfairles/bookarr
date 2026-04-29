@@ -166,6 +166,8 @@ class ListenarrClient:
             author = ", ".join(str(value) for value in author)
         if isinstance(cover, dict):
             cover = self._first_value(cover, ["url", "remoteUrl"])
+        if isinstance(cover, str) and cover.startswith("/"):
+            cover = f"{self.base_url}{cover}"
         return {
             "source_id": str(source_id or title or ""),
             "title": str(title or "Untitled audiobook"),
