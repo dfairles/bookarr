@@ -1,6 +1,6 @@
 services:
   bookarr:
-    build: .
+    image: ghcr.io/dfairles/bookarr:latest
     container_name: bookarr
     restart: unless-stopped
     ports:
@@ -10,7 +10,7 @@ services:
       BOOKARR_REQUESTER_PASSWORD: "change-requester-password"
       BOOKARR_ADMIN_PASSWORD: "change-admin-password"
       BOOKARR_DATABASE_URL: "sqlite:////data/bookarr.db"
-      LISTENARR_URL: "http://listenarr:4545"
+      LISTENARR_URL: "http://192.168.1.20:4545"
       LISTENARR_TOKEN: ""
       LISTENARR_AUTH_MODE: "x-api-key"
       LISTENARR_API_KEY_NAME: "apikey"
@@ -22,12 +22,6 @@ services:
       BOOKARR_STATUS_POLL_SECONDS: "300"
     volumes:
       - bookarr-data:/data
-    networks:
-      - arr
 
 volumes:
   bookarr-data:
-
-networks:
-  arr:
-    external: true
