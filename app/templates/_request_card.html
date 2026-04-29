@@ -1,0 +1,19 @@
+<article class="request-card">
+  <div class="cover small">
+    {% if item.cover_url %}
+      <img src="{{ item.cover_url }}" alt="">
+    {% else %}
+      <span>No cover</span>
+    {% endif %}
+  </div>
+  <div class="request-main">
+    <h2>{{ item.title }}</h2>
+    <p>{{ item.author }}</p>
+    {% if user.role == "admin" %}<p class="muted">Requested by {{ item.user_name }}</p>{% endif %}
+    {% if item.error_message %}<p class="error-text">{{ item.error_message }}</p>{% endif %}
+  </div>
+  <div class="request-side">
+    <span class="status status-{{ item.status.value }}">{{ item.status.value }}</span>
+    <time>{{ item.updated_at.strftime("%b %-d, %Y") }}</time>
+  </div>
+</article>

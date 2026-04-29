@@ -1,0 +1,33 @@
+services:
+  bookarr:
+    build: .
+    container_name: bookarr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      BOOKARR_SECRET_KEY: "change-this-long-random-string"
+      BOOKARR_REQUESTER_PASSWORD: "change-requester-password"
+      BOOKARR_ADMIN_PASSWORD: "change-admin-password"
+      BOOKARR_DATABASE_URL: "sqlite:////data/bookarr.db"
+      LISTENARR_URL: "http://listenarr:4545"
+      LISTENARR_TOKEN: ""
+      LISTENARR_AUTH_MODE: "x-api-key"
+      LISTENARR_API_KEY_NAME: "apikey"
+      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
+      LISTENARR_SEARCH_QUERY_PARAM: "query"
+      LISTENARR_SEARCH_REGION: "us"
+      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
+      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
+      BOOKARR_STATUS_POLL_SECONDS: "300"
+    volumes:
+      - bookarr-data:/data
+    networks:
+      - arr
+
+volumes:
+  bookarr-data:
+
+networks:
+  arr:
+    external: true

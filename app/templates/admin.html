@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Admin</p>
+    <h1>All requests</h1>
+  </div>
+  <form method="post" action="/poll">
+    <button class="secondary" type="submit">Refresh statuses</button>
+  </form>
+</section>
+
+{% if requests %}
+  <section class="request-list">
+    {% for item in requests %}
+      {% include "_request_card.html" %}
+    {% endfor %}
+  </section>
+{% else %}
+  <section class="empty">
+    <h2>No requests yet</h2>
+    <p>Requester activity will appear here.</p>
+  </section>
+{% endif %}
+{% endblock %}

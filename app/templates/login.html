@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-panel">
+  <div>
+    <p class="eyebrow">Audiobook requests</p>
+    <h1>Sign in to Bookarr</h1>
+    <p class="muted">Use the shared requester or admin password configured on your server.</p>
+  </div>
+  <form class="panel" method="post" action="/login">
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <label>
+      Display name
+      <input name="name" autocomplete="name" placeholder="Daniel" required>
+    </label>
+    <label>
+      Role
+      <select name="role">
+        <option value="requester">Requester</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <label>
+      Password
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button class="primary" type="submit">Sign in</button>
+  </form>
+</section>
+{% endblock %}

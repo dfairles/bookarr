@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Listenarr search</p>
+    <h1>Find an audiobook</h1>
+  </div>
+</section>
+
+<form class="search-box" method="get" action="/search">
+  <input name="q" value="{{ q }}" placeholder="Search by title or author" autofocus>
+  <button class="primary" type="submit">Search</button>
+</form>
+
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+{% if results %}
+  <section class="results-grid">
+    {% for book in results %}
+      <article class="book-card">
+        <div class="cover">
+          {% if book.cover_url %}
+            <img src="{{ book.cover_url }}" alt="">
+          {% else %}
+            <span>No cover</span>
+          {% endif %}
+        </div>
+        <div class="book-meta">
+          <h2>{{ book.title }}</h2>
+          <p>{{ book.author }}</p>
+          <form method="post" action="/request">
+            <input type="hidden" name="source_id" value="{{ book.source_id }}">
+            <input type="hidden" name="title" value="{{ book.title }}">
+            <input type="hidden" name="author" value="{{ book.author }}">
+            <input type="hidden" name="cover_url" value="{{ book.cover_url }}">
+            <button class="secondary" type="submit">Request</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% elif q %}
+  <section class="empty">
+    <h2>No matches</h2>
+    <p>Try a shorter title, author name, or alternate spelling.</p>
+  </section>
+{% endif %}
+{% endblock %}

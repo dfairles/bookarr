@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+from app.config import Settings
+from app.models import RequestStatus
+
+
+class ListenarrError(RuntimeError):
+    pass
+
+
+class ListenarrClient:
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.base_url = settings.listenarr_url.rstrip("/")
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"Accept": "application/json"}
+        auth_mode = self.settings.listenarr_auth_mode.lower()
+        if self.settings.listenarr_token and auth_mode == "bearer":
+            headers["Authorization"] = f"Bearer {self.settings.listenarr_token}"
+        if self.settings.listenarr_token and auth_mode == "x-api-key":
+            headers["X-Api-Key"] = self.settings.listenarr_token
+        return headers
+
+    def _params(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        merged = dict(params or {})
+        auth_mode = self.settings.listenarr_auth_mode.lower()
+        if self.settings.listenarr_token and auth_mode == "query":
+            merged[self.settings.listenarr_api_key_name] = self.settings.listenarr_token
+        return merged
+
+    async def search(self, query: str) -> list[dict[str, str]]:
+        params = {self.settings.listenarr_search_query_param: query}
+        if self.settings.listenarr_search_region:
+            params["region"] = self.settings.listenarr_search_region
+        payload = await self._request("GET", self.settings.listenarr_search_path, params=params)
+        raw_results = payload.get("results", payload) if isinstance(payload, dict) else payload
+        if not isinstance(raw_results, list):
+            return []
+        return [self._normalize_result(item) for item in raw_results if isinstance(item, dict)]
+
+    async def request_book(self, book: dict[str, str]) -> dict[str, str]:
+        payload = {
+            "metadata": {
+                "title": book["title"],
+                "authors": [book.get("author", "")] if book.get("author") else [],
+                "imageUrl": book.get("cover_url", ""),
+            },
+            "monitored": True,
+            "autoSearch": True,
+        }
+        self._attach_external_id(payload["metadata"], book["source_id"])
+        response = await self._request("POST", self.settings.listenarr_request_path, json=payload)
+        listenarr_id = self._first_value(response, ["id", "bookId", "listenarrId", "requestId"]) if isinstance(response, dict) else ""
+        return {"listenarr_id": str(listenarr_id or book["source_id"])}
+
+    async def get_status(self, listenarr_id: str) -> RequestStatus | None:
+        if not listenarr_id:
+            return None
+        path = self.settings.listenarr_status_path.format(listenarr_id=listenarr_id)
+        payload = await self._request("GET", path)
+        if not isinstance(payload, dict):
+            return None
+        return self._normalize_status(str(self._first_value(payload, ["status", "state", "downloadStatus"]) or ""))
+
+    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        url = f"{self.base_url}{path if path.startswith('/') else '/' + path}"
+        kwargs["params"] = self._params(kwargs.get("params"))
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.request(method, url, headers=self._headers(), **kwargs)
+                response.raise_for_status()
+                if not response.content:
+                    return {}
+                return response.json()
+        except httpx.HTTPStatusError as exc:
+            raise ListenarrError(f"Listenarr returned {exc.response.status_code}") from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ListenarrError("Could not reach Listenarr") from exc
+
+    def _normalize_result(self, item: dict[str, Any]) -> dict[str, str]:
+        data = item.get("metadata") if isinstance(item.get("metadata"), dict) else item
+        source_id = self._first_value(data, ["asin", "isbn", "id", "bookId", "foreignId", "goodreadsId", "titleSlug"])
+        title = self._first_value(data, ["title", "bookTitle", "name"])
+        author = self._first_value(data, ["author", "authorName", "authors"])
+        cover = self._first_value(data, ["imageUrl", "coverUrl", "cover", "image", "posterUrl"])
+        if isinstance(author, list):
+            author = ", ".join(str(value) for value in author)
+        if isinstance(cover, dict):
+            cover = self._first_value(cover, ["url", "remoteUrl"])
+        return {
+            "source_id": str(source_id or title or ""),
+            "title": str(title or "Untitled audiobook"),
+            "author": str(author or "Unknown author"),
+            "cover_url": str(cover or ""),
+        }
+
+    def _attach_external_id(self, metadata: dict[str, Any], source_id: str) -> None:
+        clean_id = (source_id or "").strip()
+        if not clean_id:
+            return
+        compact_id = clean_id.replace("-", "")
+        if len(compact_id) in {10, 13} and compact_id.isdigit():
+            metadata["isbn"] = clean_id
+        elif len(clean_id) == 10 and clean_id.isalnum():
+            metadata["asin"] = clean_id
+        else:
+            metadata["externalId"] = clean_id
+
+    def _normalize_status(self, value: str) -> RequestStatus | None:
+        normalized = value.lower().replace("_", " ").replace("-", " ")
+        if any(word in normalized for word in ["complete", "completed", "available", "downloaded"]):
+            return RequestStatus.completed
+        if any(word in normalized for word in ["fail", "error", "missing"]):
+            return RequestStatus.failed
+        if any(word in normalized for word in ["download", "grabbed", "importing", "processing"]):
+            return RequestStatus.downloading
+        if any(word in normalized for word in ["sent", "queued", "requested", "pending"]):
+            return RequestStatus.sent
+        return None
+
+    def _first_value(self, data: dict[str, Any], keys: list[str]) -> Any:
+        for key in keys:
+            if key in data and data[key] not in (None, ""):
+                return data[key]
+        return None

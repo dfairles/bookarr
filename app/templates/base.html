@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">B</span>
+        <span>{{ app_name }}</span>
+      </a>
+      {% if user %}
+        <nav>
+          <a href="/">Requests</a>
+          <a href="/search">Search</a>
+          {% if user.role == "admin" %}<a href="/admin">Admin</a>{% endif %}
+          <form method="post" action="/logout">
+            <button class="link-button" type="submit">Log out</button>
+          </form>
+        </nav>
+      {% endif %}
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
