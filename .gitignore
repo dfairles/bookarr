@@ -5,3 +5,4 @@ __pycache__/
 data/
 bookarr-dev.db
 run-dev.sh
+.DS_Store
