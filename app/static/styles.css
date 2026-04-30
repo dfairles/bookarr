@@ -403,6 +403,71 @@ button,
   margin-bottom: 8px;
 }
 
+.charts-section {
+  margin-top: 40px;
+}
+
+.charts-section .eyebrow {
+  margin-bottom: 14px;
+}
+
+.charts-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-card {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  min-height: 0;
+  padding: 10px 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.chart-card:hover {
+  background: var(--panel-2);
+}
+
+.chart-action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.chart-rank {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  min-width: 20px;
+  text-align: right;
+}
+
+.chart-meta {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chart-meta strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-meta span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .auth-panel {
     grid-template-columns: 1fr;

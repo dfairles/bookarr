@@ -7,8 +7,8 @@
   </div>
 </section>
 
-<form class="search-box" method="get" action="/search">
-  <input name="q" value="{{ q }}" placeholder="Search by title or author" autofocus>
+<form class="search-box" method="get" action="/search" id="search-form">
+  <input name="q" id="search-input" value="{{ q }}" placeholder="Search by title or author" autofocus>
   <button class="primary" type="submit">Search</button>
 </form>
 
@@ -28,7 +28,9 @@
         <div class="book-meta">
           <h2>{{ book.title }}</h2>
           <p>{{ book.author }}</p>
-          {% if book.source_id in user_source_ids %}
+          {% if book.source_id in in_library_ids %}
+            <span class="status status-completed">In Library</span>
+          {% elif book.source_id in user_source_ids %}
             <span class="already-requested">Already requested</span>
           {% else %}
             <form method="post" action="/request">
@@ -49,4 +51,54 @@
     <p>Try a shorter title, author name, or alternate spelling.</p>
   </section>
 {% endif %}
+
+{% if top_books %}
+  <section class="charts-section">
+    <p class="eyebrow">Apple Books · Top Audiobooks</p>
+    <div class="charts-grid">
+      {% for book in top_books %}
+        <div class="chart-card">
+          <span class="chart-rank">{{ loop.index }}</span>
+          <div class="cover small">
+            {% if book.cover_url %}
+              <img src="{{ book.cover_url }}" alt="">
+            {% else %}
+              <span>No cover</span>
+            {% endif %}
+          </div>
+          <div class="chart-meta">
+            <strong>{{ book.title }}</strong>
+            <span>{{ book.author }}</span>
+          </div>
+          <div class="chart-action">
+            {% if book.source_id and book.source_id in in_library_ids %}
+              <span class="status status-completed">In Library</span>
+            {% elif book.source_id and book.source_id in user_source_ids %}
+              <span class="already-requested">Requested</span>
+            {% elif book.source_id %}
+              <form method="post" action="/request">
+                <input type="hidden" name="source_id" value="{{ book.source_id }}">
+                <input type="hidden" name="title" value="{{ book.title }}">
+                <input type="hidden" name="author" value="{{ book.author }}">
+                <input type="hidden" name="cover_url" value="{{ book.cover_url }}">
+                <button class="secondary" type="submit">Request</button>
+              </form>
+            {% else %}
+              <button class="secondary chart-search-btn" type="button" data-title="{{ book.title }}" data-author="{{ book.author }}">Search</button>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+<script>
+  document.querySelectorAll('.chart-search-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.getElementById('search-input').value = btn.dataset.title + ' ' + btn.dataset.author;
+      document.getElementById('search-form').submit();
+    });
+  });
+</script>
 {% endblock %}

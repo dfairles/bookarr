@@ -16,6 +16,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.charts import get_enriched_top_audiobooks
 from app.config import get_settings
 from app.database import SessionLocal, db_session, init_db
 from app.listenarr import ListenarrClient, ListenarrError
@@ -142,10 +143,21 @@ async def search_page(request: Request, q: str = "", db: Annotated[Session, Depe
     results: list[dict[str, str]] = []
     error = ""
     user_source_ids: set[str] = set()
+    in_library_ids: set[str] = set()
+    top_books: list[dict[str, str]] = []
     if q.strip():
         try:
             async with ListenarrClient(settings) as client:
                 results = await client.search(q.strip())
+                checks = await asyncio.gather(
+                    *[client.in_library(b["source_id"]) for b in results],
+                    return_exceptions=True,
+                )
+            in_library_ids = {
+                b["source_id"]
+                for b, hit in zip(results, checks)
+                if hit is True
+            }
         except ListenarrError as exc:
             error = str(exc)
         user_source_ids = set(
@@ -153,7 +165,24 @@ async def search_page(request: Request, q: str = "", db: Annotated[Session, Depe
                 select(AudiobookRequest.source_id).where(AudiobookRequest.user_name == user["name"])
             ).all()
         )
-    return render(request, "search.html", q=q, results=results, error=error, user_source_ids=user_source_ids)
+    else:
+        async with ListenarrClient(settings) as client:
+            top_books = await get_enriched_top_audiobooks(client.search)
+            chart_source_ids = [b.get("source_id", "") for b in top_books]
+            checks = await asyncio.gather(
+                *[client.in_library(sid) for sid in chart_source_ids],
+                return_exceptions=True,
+            )
+        in_library_ids = {
+            sid for sid, hit in zip(chart_source_ids, checks) if hit is True
+        }
+        user_source_ids = set(
+            db.scalars(
+                select(AudiobookRequest.source_id).where(AudiobookRequest.user_name == user["name"])
+            ).all()
+        )
+    return render(request, "search.html", q=q, results=results, error=error,
+                  user_source_ids=user_source_ids, in_library_ids=in_library_ids, top_books=top_books)
 
 
 @app.post("/request")

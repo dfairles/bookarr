@@ -78,6 +78,12 @@ class ListenarrClient:
             return None
         return self._normalize_status_payload(payload)
 
+    async def in_library(self, source_id: str) -> bool:
+        try:
+            return bool(await self.resolve_library_id(source_id))
+        except ListenarrError:
+            return False
+
     async def resolve_library_id(self, source_id: str) -> str:
         clean_id = (source_id or "").strip()
         compact_id = clean_id.replace("-", "")
