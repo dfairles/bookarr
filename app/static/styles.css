@@ -348,6 +348,38 @@ button,
   color: var(--danger);
 }
 
+.flash {
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  padding: 10px 14px;
+}
+
+.flash-success {
+  background: rgba(47, 191, 143, 0.12);
+  border: 1px solid rgba(47, 191, 143, 0.3);
+  color: var(--accent);
+}
+
+.flash-info {
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: var(--blue);
+}
+
+.flash-warn {
+  background: rgba(245, 184, 75, 0.12);
+  border: 1px solid rgba(245, 184, 75, 0.3);
+  color: var(--warn);
+}
+
+.already-requested {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .alert,
 .error-text {
   color: var(--danger);

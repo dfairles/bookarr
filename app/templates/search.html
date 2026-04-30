@@ -28,13 +28,17 @@
         <div class="book-meta">
           <h2>{{ book.title }}</h2>
           <p>{{ book.author }}</p>
-          <form method="post" action="/request">
-            <input type="hidden" name="source_id" value="{{ book.source_id }}">
-            <input type="hidden" name="title" value="{{ book.title }}">
-            <input type="hidden" name="author" value="{{ book.author }}">
-            <input type="hidden" name="cover_url" value="{{ book.cover_url }}">
-            <button class="secondary" type="submit">Request</button>
-          </form>
+          {% if book.source_id in user_source_ids %}
+            <span class="already-requested">Already requested</span>
+          {% else %}
+            <form method="post" action="/request">
+              <input type="hidden" name="source_id" value="{{ book.source_id }}">
+              <input type="hidden" name="title" value="{{ book.title }}">
+              <input type="hidden" name="author" value="{{ book.author }}">
+              <input type="hidden" name="cover_url" value="{{ book.cover_url }}">
+              <button class="secondary" type="submit">Request</button>
+            </form>
+          {% endif %}
         </div>
       </article>
     {% endfor %}

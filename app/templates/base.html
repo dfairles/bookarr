@@ -30,6 +30,9 @@
       </div>
     </section>
     <main>
+      {% if flash %}
+        <div class="flash flash-{{ flash.type }}">{{ flash.message }}</div>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </body>

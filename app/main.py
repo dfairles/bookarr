@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
 
@@ -11,19 +12,41 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeSerializer
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import SessionLocal, db_session, init_db
 from app.listenarr import ListenarrClient, ListenarrError
-from app.models import AudiobookRequest, RequestStatus, Role
+from app.models import AudiobookRequest, RequestStatus, Role, utcnow
 
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name)
 serializer = URLSafeSerializer(settings.secret_key, salt="bookarr-session")
+
+FLASH_MESSAGES: dict[str, tuple[str, str]] = {
+    "requested": ("success", "Your request has been submitted."),
+    "duplicate": ("info", "You've already requested that audiobook."),
+    "polled": ("success", "Statuses refreshed."),
+    "poll_error": ("warn", "Statuses refreshed, but some requests could not be checked — see errors below."),
+    "deleted": ("success", "Request deleted."),
+}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(poll_statuses, "interval", seconds=settings.status_poll_seconds, next_run_time=datetime.now(timezone.utc))
+    if settings.completed_retention_days > 0:
+        scheduler.add_job(cleanup_completed_requests, "interval", hours=24, next_run_time=datetime.now(timezone.utc))
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
@@ -51,6 +74,9 @@ def require_user(request: Request) -> dict[str, str]:
 
 
 def render(request: Request, template: str, **context):
+    flash_key = request.query_params.get("flash", "")
+    flash_type, flash_message = FLASH_MESSAGES.get(flash_key, ("", ""))
+    flash = {"type": flash_type, "message": flash_message} if flash_message else None
     return templates.TemplateResponse(
         request,
         template,
@@ -58,25 +84,16 @@ def render(request: Request, template: str, **context):
             "app_name": settings.app_name,
             "app_version": settings.app_version,
             "user": current_user(request),
+            "flash": flash,
             **context,
         },
     )
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    init_db()
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(poll_statuses, "interval", seconds=settings.status_poll_seconds, next_run_time=datetime.utcnow())
-    if settings.completed_retention_days > 0:
-        scheduler.add_job(cleanup_completed_requests, "interval", hours=24, next_run_time=datetime.utcnow())
-    scheduler.start()
-
-
 @app.get("/")
 async def home(request: Request, db: Annotated[Session, Depends(db_session)]):
     user = require_user(request)
-    rows = db.scalars(request_stmt(user).limit(20)).all()
+    rows = db.scalars(request_stmt(user)).all()
     return render(request, "dashboard.html", requests=rows)
 
 
@@ -120,16 +137,23 @@ async def logout():
 
 
 @app.get("/search")
-async def search_page(request: Request, q: str = ""):
-    require_user(request)
+async def search_page(request: Request, q: str = "", db: Annotated[Session, Depends(db_session)] = None):
+    user = require_user(request)
     results: list[dict[str, str]] = []
     error = ""
+    user_source_ids: set[str] = set()
     if q.strip():
         try:
-            results = await ListenarrClient(settings).search(q.strip())
+            async with ListenarrClient(settings) as client:
+                results = await client.search(q.strip())
         except ListenarrError as exc:
             error = str(exc)
-    return render(request, "search.html", q=q, results=results, error=error)
+        user_source_ids = set(
+            db.scalars(
+                select(AudiobookRequest.source_id).where(AudiobookRequest.user_name == user["name"])
+            ).all()
+        )
+    return render(request, "search.html", q=q, results=results, error=error, user_source_ids=user_source_ids)
 
 
 @app.post("/request")
@@ -142,15 +166,20 @@ async def request_book(
     cover_url: Annotated[str, Form()] = "",
 ):
     user = require_user(request)
-    book = {
-        "source_id": source_id,
-        "title": title,
-        "author": author,
-        "cover_url": cover_url,
-    }
+    existing = db.scalar(
+        select(AudiobookRequest).where(
+            AudiobookRequest.user_name == user["name"],
+            AudiobookRequest.source_id == source_id,
+        )
+    )
+    if existing:
+        return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
+
+    book = {"source_id": source_id, "title": title, "author": author, "cover_url": cover_url}
     row = AudiobookRequest(user_name=user["name"], **book, status=RequestStatus.sent)
     try:
-        listenarr_response = await ListenarrClient(settings).request_book(book)
+        async with ListenarrClient(settings) as client:
+            listenarr_response = await client.request_book(book)
         row.listenarr_id = listenarr_response["listenarr_id"]
     except ListenarrError as exc:
         row.status = RequestStatus.failed
@@ -160,7 +189,8 @@ async def request_book(
         db.commit()
     except IntegrityError:
         db.rollback()
-    return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/?flash=requested", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/admin")
@@ -177,8 +207,9 @@ async def poll_now(request: Request):
     user = require_user(request)
     if user["role"] != Role.admin.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    await poll_statuses()
-    return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
+    had_errors = await poll_statuses()
+    flash = "poll_error" if had_errors else "polled"
+    return RedirectResponse(f"/admin?flash={flash}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/admin/requests/{request_id}/delete")
@@ -194,7 +225,7 @@ async def delete_failed_request(
     if row and (row.status == RequestStatus.failed or row.error_message):
         db.delete(row)
         db.commit()
-    return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/admin?flash=deleted", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def request_stmt(user: dict[str, str]):
@@ -204,50 +235,55 @@ def request_stmt(user: dict[str, str]):
     return stmt
 
 
-async def poll_statuses() -> None:
+async def poll_statuses() -> bool:
     db = SessionLocal()
+    had_errors = False
     try:
         rows = db.scalars(
             select(AudiobookRequest).where(AudiobookRequest.status.in_([RequestStatus.sent, RequestStatus.downloading]))
         ).all()
-        client = ListenarrClient(settings)
-        for row in rows:
-            if not row.listenarr_id or not row.listenarr_id.isdigit():
+        async with ListenarrClient(settings) as client:
+            for row in rows:
+                if not row.listenarr_id or not row.listenarr_id.isdigit():
+                    try:
+                        resolved_id = await client.resolve_library_id(row.source_id)
+                    except ListenarrError as exc:
+                        row.status = RequestStatus.failed
+                        row.error_message = str(exc)
+                        had_errors = True
+                        continue
+                    if not resolved_id:
+                        row.status = RequestStatus.failed
+                        row.error_message = "Could not find this request in Listenarr's library."
+                        had_errors = True
+                        continue
+                    row.listenarr_id = resolved_id
+                    row.error_message = ""
                 try:
-                    resolved_id = await client.resolve_library_id(row.source_id)
+                    new_status = await client.get_status(row.listenarr_id)
                 except ListenarrError as exc:
                     row.error_message = str(exc)
+                    had_errors = True
                     continue
-                if not resolved_id:
-                    row.error_message = "Could not find this request in Listenarr's library."
-                    continue
-                row.listenarr_id = resolved_id
-                row.error_message = ""
-            try:
-                new_status = await client.get_status(row.listenarr_id)
-            except ListenarrError as exc:
-                row.error_message = str(exc)
-                continue
-            if new_status and new_status != row.status:
-                row.status = new_status
-                row.error_message = ""
+                if new_status and new_status != row.status:
+                    row.status = new_status
+                    row.error_message = ""
         db.commit()
     finally:
         db.close()
+    return had_errors
 
 
 async def cleanup_completed_requests() -> None:
-    cutoff = datetime.utcnow() - timedelta(days=settings.completed_retention_days)
+    cutoff = utcnow() - timedelta(days=settings.completed_retention_days)
     db = SessionLocal()
     try:
-        rows = db.scalars(
-            select(AudiobookRequest).where(
+        db.execute(
+            delete(AudiobookRequest).where(
                 AudiobookRequest.status == RequestStatus.completed,
                 AudiobookRequest.updated_at < cutoff,
             )
-        ).all()
-        for row in rows:
-            db.delete(row)
+        )
         db.commit()
     finally:
         db.close()

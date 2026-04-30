@@ -17,6 +17,16 @@ class ListenarrClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.base_url = settings.listenarr_url.rstrip("/")
+        self._client = httpx.AsyncClient(timeout=20)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def __aenter__(self) -> "ListenarrClient":
+        return self
+
+    async def __aexit__(self, *_: Any) -> None:
+        await self.aclose()
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json"}
@@ -85,17 +95,16 @@ class ListenarrClient:
         kwargs["params"] = self._params(kwargs.get("params"))
         headers = self._headers()
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                if method.upper() == "POST":
-                    headers["X-XSRF-TOKEN"] = await self._antiforgery_token(client)
-                response = await client.request(method, url, headers=headers, **kwargs)
-                response.raise_for_status()
-                if not response.content:
-                    return {}
-                try:
-                    return response.json()
-                except ValueError as exc:
-                    raise ListenarrError("Listenarr returned a non-JSON response") from exc
+            if method.upper() == "POST":
+                headers["X-XSRF-TOKEN"] = await self._antiforgery_token()
+            response = await self._client.request(method, url, headers=headers, **kwargs)
+            response.raise_for_status()
+            if not response.content:
+                return {}
+            try:
+                return response.json()
+            except ValueError as exc:
+                raise ListenarrError("Listenarr returned a non-JSON response") from exc
         except httpx.HTTPStatusError as exc:
             body = exc.response.text[:1000]
             raise ListenarrError(
@@ -104,10 +113,10 @@ class ListenarrClient:
         except httpx.HTTPError as exc:
             raise ListenarrError(f"Could not reach Listenarr: {exc}") from exc
 
-    async def _antiforgery_token(self, client: httpx.AsyncClient) -> str:
+    async def _antiforgery_token(self) -> str:
         path = self.settings.listenarr_antiforgery_path
         url = f"{self.base_url}{path if path.startswith('/') else '/' + path}"
-        response = await client.get(url, headers=self._headers(), params=self._params())
+        response = await self._client.get(url, headers=self._headers(), params=self._params())
         response.raise_for_status()
         token = self._extract_antiforgery_token(response)
         if not token:
