@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     )
     listenarr_status_path: str = Field(default="/api/v1/library/{listenarr_id}", validation_alias="LISTENARR_STATUS_PATH")
     status_poll_seconds: int = Field(default=300, validation_alias="BOOKARR_STATUS_POLL_SECONDS")
+    completed_retention_days: int = Field(default=30, validation_alias="BOOKARR_COMPLETED_RETENTION_DAYS")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

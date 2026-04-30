@@ -18,8 +18,10 @@ services:
       LISTENARR_SEARCH_QUERY_PARAM: "query"
       LISTENARR_SEARCH_REGION: "us"
       LISTENARR_REQUEST_PATH: "/api/v1/library/add"
+      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
       LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
       BOOKARR_STATUS_POLL_SECONDS: "300"
+      BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
       - bookarr-data:/data
 

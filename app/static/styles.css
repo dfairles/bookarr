@@ -77,16 +77,22 @@ nav a:hover,
 }
 
 .site-banner {
-  align-items: center;
   background: linear-gradient(90deg, rgba(47, 191, 143, 0.16), rgba(96, 165, 250, 0.1));
   border-bottom: 1px solid var(--line);
   color: var(--text);
-  display: flex;
   font-size: 14px;
   font-weight: 800;
+  padding: 10px clamp(16px, 5vw, 44px);
+}
+
+.site-banner-inner {
+  align-items: center;
+  display: flex;
   gap: 12px;
   justify-content: space-between;
-  padding: 10px clamp(16px, 5vw, 44px);
+  margin: 0 auto;
+  max-width: 1120px;
+  width: 100%;
 }
 
 .version {
@@ -201,6 +207,18 @@ button,
   background: var(--panel-2);
   border: 1px solid var(--line);
   color: var(--text);
+}
+
+.danger-button {
+  background: rgba(255, 107, 107, 0.14);
+  border: 1px solid rgba(255, 107, 107, 0.34);
+  color: var(--danger);
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.danger-button:hover {
+  background: rgba(255, 107, 107, 0.22);
 }
 
 .link-button {
@@ -359,9 +377,13 @@ button,
   }
 
   .topbar,
-  .site-banner,
   .page-head,
   .request-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .site-banner-inner {
     align-items: flex-start;
     flex-direction: column;
   }

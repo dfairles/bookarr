@@ -56,7 +56,7 @@ class ListenarrClient:
         }
         self._attach_external_id(payload["metadata"], book["source_id"])
         response = await self._request("POST", self.settings.listenarr_request_path, json=payload)
-        listenarr_id = self._first_value(response, ["id", "bookId", "listenarrId", "requestId"]) if isinstance(response, dict) else ""
+        listenarr_id = self._listenarr_id(response)
         return {"listenarr_id": str(listenarr_id or book["source_id"])}
 
     async def get_status(self, listenarr_id: str) -> RequestStatus | None:
@@ -66,7 +66,19 @@ class ListenarrClient:
         payload = await self._request("GET", path)
         if not isinstance(payload, dict):
             return None
-        return self._normalize_status(str(self._first_value(payload, ["status", "state", "downloadStatus"]) or ""))
+        return self._normalize_status_payload(payload)
+
+    async def resolve_library_id(self, source_id: str) -> str:
+        clean_id = (source_id or "").strip()
+        compact_id = clean_id.replace("-", "")
+        if len(clean_id) == 10 and clean_id.isalnum():
+            payload = await self._request("GET", f"/api/v1/library/by-asin/{clean_id}")
+        elif len(compact_id) in {10, 13} and compact_id.isdigit():
+            payload = await self._request("GET", f"/api/v1/library/by-isbn/{clean_id}")
+        else:
+            return ""
+        listenarr_id = self._listenarr_id(payload)
+        return str(listenarr_id or "")
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self.base_url}{path if path.startswith('/') else '/' + path}"
@@ -187,6 +199,17 @@ class ListenarrClient:
         else:
             metadata["externalId"] = clean_id
 
+    def _listenarr_id(self, response: Any) -> Any:
+        if not isinstance(response, dict):
+            return ""
+        listenarr_id = self._first_value(response, ["id", "bookId", "listenarrId", "requestId"])
+        if listenarr_id:
+            return listenarr_id
+        audiobook = response.get("audiobook")
+        if isinstance(audiobook, dict):
+            return self._first_value(audiobook, ["id", "bookId", "listenarrId"])
+        return ""
+
     def _normalize_status(self, value: str) -> RequestStatus | None:
         normalized = value.lower().replace("_", " ").replace("-", " ")
         if any(word in normalized for word in ["complete", "completed", "available", "downloaded"]):
@@ -196,6 +219,19 @@ class ListenarrClient:
         if any(word in normalized for word in ["download", "grabbed", "importing", "processing"]):
             return RequestStatus.downloading
         if any(word in normalized for word in ["sent", "queued", "requested", "pending"]):
+            return RequestStatus.sent
+        return None
+
+    def _normalize_status_payload(self, payload: dict[str, Any]) -> RequestStatus | None:
+        status = self._normalize_status(str(self._first_value(payload, ["status", "state", "downloadStatus"]) or ""))
+        if status:
+            return status
+        files = payload.get("files")
+        if isinstance(files, list) and files:
+            return RequestStatus.completed
+        if self._first_value(payload, ["filePath", "fileSize"]):
+            return RequestStatus.completed
+        if payload.get("wanted") is True or payload.get("monitored") is True:
             return RequestStatus.sent
         return None
 

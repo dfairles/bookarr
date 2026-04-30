@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -68,6 +68,8 @@ async def startup() -> None:
     init_db()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(poll_statuses, "interval", seconds=settings.status_poll_seconds, next_run_time=datetime.utcnow())
+    if settings.completed_retention_days > 0:
+        scheduler.add_job(cleanup_completed_requests, "interval", hours=24, next_run_time=datetime.utcnow())
     scheduler.start()
 
 
@@ -179,6 +181,22 @@ async def poll_now(request: Request):
     return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.post("/admin/requests/{request_id}/delete")
+async def delete_failed_request(
+    request: Request,
+    request_id: int,
+    db: Annotated[Session, Depends(db_session)],
+):
+    user = require_user(request)
+    if user["role"] != Role.admin.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    row = db.get(AudiobookRequest, request_id)
+    if row and (row.status == RequestStatus.failed or row.error_message):
+        db.delete(row)
+        db.commit()
+    return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
+
+
 def request_stmt(user: dict[str, str]):
     stmt = select(AudiobookRequest).order_by(AudiobookRequest.updated_at.desc())
     if user["role"] != Role.admin.value:
@@ -194,14 +212,42 @@ async def poll_statuses() -> None:
         ).all()
         client = ListenarrClient(settings)
         for row in rows:
+            if not row.listenarr_id or not row.listenarr_id.isdigit():
+                try:
+                    resolved_id = await client.resolve_library_id(row.source_id)
+                except ListenarrError as exc:
+                    row.error_message = str(exc)
+                    continue
+                if not resolved_id:
+                    row.error_message = "Could not find this request in Listenarr's library."
+                    continue
+                row.listenarr_id = resolved_id
+                row.error_message = ""
             try:
-                new_status = await client.get_status(row.listenarr_id or row.source_id)
+                new_status = await client.get_status(row.listenarr_id)
             except ListenarrError as exc:
                 row.error_message = str(exc)
                 continue
             if new_status and new_status != row.status:
                 row.status = new_status
                 row.error_message = ""
+        db.commit()
+    finally:
+        db.close()
+
+
+async def cleanup_completed_requests() -> None:
+    cutoff = datetime.utcnow() - timedelta(days=settings.completed_retention_days)
+    db = SessionLocal()
+    try:
+        rows = db.scalars(
+            select(AudiobookRequest).where(
+                AudiobookRequest.status == RequestStatus.completed,
+                AudiobookRequest.updated_at < cutoff,
+            )
+        ).all()
+        for row in rows:
+            db.delete(row)
         db.commit()
     finally:
         db.close()

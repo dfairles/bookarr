@@ -22,7 +22,7 @@ Bookarr is configured with environment variables.
 | Variable | Purpose |
 | --- | --- |
 | `BOOKARR_SECRET_KEY` | Secret used for signed login cookies. Use a long random value. |
-| `BOOKARR_VERSION` | Version label shown in the site banner. Default: `0.1`. |
+| `BOOKARR_VERSION` | Version label shown in the site banner. Default: `0.1`; CI Docker builds auto-stamp this as `0.1.<run number>`. |
 | `BOOKARR_REQUESTER_PASSWORD` | Shared password for normal requesters. |
 | `BOOKARR_ADMIN_PASSWORD` | Shared password for admins. |
 | `BOOKARR_DATABASE_URL` | Database URL. Docker default is `sqlite:////data/bookarr.db`. |
@@ -37,6 +37,7 @@ Bookarr is configured with environment variables.
 | `LISTENARR_ANTIFORGERY_PATH` | Antiforgery token endpoint path. Default: `/api/v1/antiforgery/token`. |
 | `LISTENARR_STATUS_PATH` | Status endpoint path. Use `{listenarr_id}` as the placeholder. |
 | `BOOKARR_STATUS_POLL_SECONDS` | How often Bookarr checks Listenarr for status updates. |
+| `BOOKARR_COMPLETED_RETENTION_DAYS` | How long completed requests remain in Bookarr before cleanup. Default: `30`; set to `0` to disable. |
 
 The defaults follow Listenarr's versioned API (`/api/v1/...`). The paths remain configurable because self-hosted services and forks can change route names.
 

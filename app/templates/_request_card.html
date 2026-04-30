@@ -15,5 +15,10 @@
   <div class="request-side">
     <span class="status status-{{ item.status.value }}">{{ item.status.value }}</span>
     <time>{{ item.updated_at.strftime("%b %-d, %Y") }}</time>
+    {% if user.role == "admin" and (item.status.value == "failed" or item.error_message) %}
+      <form method="post" action="/admin/requests/{{ item.id }}/delete">
+        <button class="danger-button" type="submit">Delete</button>
+      </form>
+    {% endif %}
   </div>
 </article>
