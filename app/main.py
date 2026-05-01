@@ -10,7 +10,7 @@ from typing import Annotated
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeSerializer
@@ -103,6 +103,33 @@ async def home(request: Request, db: Annotated[Session, Depends(db_session)]):
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+@app.get("/cover")
+async def cover_proxy(url: str, request: Request):
+    require_user(request)
+    if not url:
+        raise HTTPException(status_code=400)
+    listenarr_base = settings.listenarr_url.rstrip("/")
+    allowed_prefixes = (listenarr_base, "https://", "http://")
+    if not any(url.startswith(p) for p in allowed_prefixes):
+        raise HTTPException(status_code=400)
+    auth_mode = settings.listenarr_auth_mode.lower()
+    headers: dict[str, str] = {}
+    if settings.listenarr_token:
+        if auth_mode == "bearer":
+            headers["Authorization"] = f"Bearer {settings.listenarr_token}"
+        elif auth_mode == "x-api-key":
+            headers["X-Api-Key"] = settings.listenarr_token
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code)
+    content_type = resp.headers.get("content-type", "image/jpeg")
+    return Response(content=resp.content, media_type=content_type)
 
 
 @app.get("/login")

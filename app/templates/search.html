@@ -20,7 +20,7 @@
       <article class="book-card">
         <div class="cover">
           {% if book.cover_url %}
-            <img src="{{ book.cover_url }}" alt="">
+            <img src="/cover?url={{ book.cover_url | urlencode }}" alt="">
           {% else %}
             <span>No cover</span>
           {% endif %}
@@ -61,7 +61,7 @@
           <span class="chart-rank">{{ loop.index }}</span>
           <div class="cover small">
             {% if book.cover_url %}
-              <img src="{{ book.cover_url }}" alt="">
+              <img src="/cover?url={{ book.cover_url | urlencode }}" alt="">
             {% else %}
               <span>No cover</span>
             {% endif %}

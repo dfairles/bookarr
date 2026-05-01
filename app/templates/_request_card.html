@@ -1,7 +1,7 @@
 <article class="request-card">
   <div class="cover small">
     {% if item.cover_url %}
-      <img src="{{ item.cover_url }}" alt="">
+      <img src="/cover?url={{ item.cover_url | urlencode }}" alt="">
     {% else %}
       <span>No cover</span>
     {% endif %}
