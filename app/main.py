@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+
+import httpx
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
@@ -111,14 +113,28 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(
     request: Request,
-    name: Annotated[str, Form()],
-    role: Annotated[Role, Form()],
+    username: Annotated[str, Form()],
     password: Annotated[str, Form()],
 ):
-    expected = settings.admin_password if role == Role.admin else settings.requester_password
-    if password != expected:
-        return render(request, "login.html", error="That password did not match the selected role.")
-    user_name = name.strip() or role.value
+    abs_url = settings.audiobookshelf_url.rstrip("/")
+    if not abs_url:
+        return render(request, "login.html", error="Audiobookshelf URL is not configured on this server.")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{abs_url}/login",
+                json={"username": username, "password": password},
+                headers={"Accept": "application/json"},
+            )
+    except Exception:
+        return render(request, "login.html", error="Could not reach Audiobookshelf — please try again.")
+    if resp.status_code != 200:
+        return render(request, "login.html", error="Invalid username or password.")
+    data = resp.json()
+    abs_user = data.get("user", {})
+    abs_type = abs_user.get("type", "user")
+    role = Role.admin if abs_type in ("root", "admin") else Role.requester
+    user_name = abs_user.get("username") or username
     response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         "bookarr_session",

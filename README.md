@@ -1,13 +1,13 @@
 # Bookarr
 
-Bookarr is a small Python web app for audiobook requests. Users sign in, search Listenarr, send requests directly to Listenarr, and track request status.
+Bookarr is a small Python web app for audiobook requests. Users sign in with their Audiobookshelf account, search Listenarr, send requests directly to Listenarr, and track request status.
 
-It is built for a personal self-hosted setup: one shared requester password, one shared admin password, SQLite storage, and Docker deployment.
+It is built for a personal self-hosted setup: Audiobookshelf for authentication, SQLite storage, and Docker deployment.
 
 ## Features
 
-- Requester and admin roles
-- Shared password per role from environment variables
+- Requester and admin roles, derived automatically from your Audiobookshelf user type
+- Sign in with your existing Audiobookshelf username and password — no separate accounts
 - Requesters see only their own requests
 - Admins see everyone's requests and can manually refresh statuses
 - Search is proxied through Listenarr
@@ -23,8 +23,7 @@ Bookarr is configured with environment variables.
 | --- | --- |
 | `BOOKARR_SECRET_KEY` | Secret used for signed login cookies. Use a long random value. |
 | `BOOKARR_VERSION` | Version label shown in the site banner. Default: `0.1`; CI Docker builds auto-stamp this as `0.1.<run number>`. |
-| `BOOKARR_REQUESTER_PASSWORD` | Shared password for normal requesters. |
-| `BOOKARR_ADMIN_PASSWORD` | Shared password for admins. |
+| `AUDIOBOOKSHELF_URL` | Base URL of your Audiobookshelf server (e.g. `http://192.168.1.20:13378`). Users log in with their Audiobookshelf credentials. Audiobookshelf `root` and `admin` users get the Bookarr admin role; all others get the requester role. |
 | `BOOKARR_DATABASE_URL` | Database URL. Docker default is `sqlite:////data/bookarr.db`. |
 | `LISTENARR_URL` | Base URL for Listenarr. In Docker this is often `http://listenarr:4545`. |
 | `LISTENARR_TOKEN` | Optional Listenarr API key. Leave blank when local auth is disabled. |
@@ -83,7 +82,7 @@ docker inspect listenarr --format '{{json .NetworkSettings.Networks}}'
 ```
 
 4. If Listenarr is on a network named `arr`, the included `docker-compose.yml` can be used as-is. If the network name is different, update the `networks` section.
-5. Set the passwords, secret key, token, Listenarr URL, and endpoint paths in `docker-compose.yml`.
+5. Set the secret key, `AUDIOBOOKSHELF_URL`, Listenarr URL, token, and endpoint paths in `docker-compose.yml`.
 6. Start Bookarr:
 
 ```bash

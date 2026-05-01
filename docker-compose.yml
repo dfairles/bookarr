@@ -7,9 +7,8 @@ services:
       - "8000:8000"
     environment:
       BOOKARR_SECRET_KEY: "change-this-long-random-string"
-      BOOKARR_REQUESTER_PASSWORD: "change-requester-password"
-      BOOKARR_ADMIN_PASSWORD: "change-admin-password"
       BOOKARR_DATABASE_URL: "sqlite:////data/bookarr.db"
+      AUDIOBOOKSHELF_URL: "http://192.168.1.20:13378"
       LISTENARR_URL: "http://192.168.1.20:4545"
       LISTENARR_TOKEN: ""
       LISTENARR_AUTH_MODE: "x-api-key"

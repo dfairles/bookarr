@@ -7,9 +7,8 @@ class Settings(BaseSettings):
     app_name: str = "Bookarr"
     app_version: str = Field(default="0.1", validation_alias="BOOKARR_VERSION")
     secret_key: str = Field(default="change-me", validation_alias="BOOKARR_SECRET_KEY")
-    requester_password: str = Field(default="requester", validation_alias="BOOKARR_REQUESTER_PASSWORD")
-    admin_password: str = Field(default="admin", validation_alias="BOOKARR_ADMIN_PASSWORD")
     database_url: str = Field(default="sqlite:////data/bookarr.db", validation_alias="BOOKARR_DATABASE_URL")
+    audiobookshelf_url: str = Field(default="", validation_alias="AUDIOBOOKSHELF_URL")
 
     listenarr_url: str = Field(default="http://listenarr:8787", validation_alias="LISTENARR_URL")
     listenarr_token: str = Field(default="", validation_alias="LISTENARR_TOKEN")
