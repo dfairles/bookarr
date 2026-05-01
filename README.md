@@ -6,12 +6,13 @@ It is built for a personal self-hosted setup: Audiobookshelf for authentication,
 
 ## Features
 
-- Requester and admin roles, derived automatically from your Audiobookshelf user type
-- Sign in with your existing Audiobookshelf username and password — no separate accounts
+- Three auth backends: Audiobookshelf, Jellyfin, or local accounts managed in Bookarr
+- Requester and admin roles (derived from your auth server's user type, or set manually for local accounts)
 - Requesters see only their own requests
 - Admins see everyone's requests and can manually refresh statuses
+- Admin approval workflow — requester submissions wait for admin sign-off before being sent to Listenarr
+- Admins can optionally bypass approval for their own requests (`BOOKARR_ADMIN_AUTO_APPROVE`)
 - Search is proxied through Listenarr
-- Requests are sent straight to Listenarr with auto-approval fields
 - Status polling keeps local history updated
 - Dark, mobile-friendly interface inspired by the `*arr` ecosystem
 
@@ -22,9 +23,14 @@ Bookarr is configured with environment variables.
 | Variable | Purpose |
 | --- | --- |
 | `BOOKARR_SECRET_KEY` | Secret used for signed login cookies. Use a long random value. |
-| `BOOKARR_VERSION` | Version label shown in the site banner. Default: `0.1`; CI Docker builds auto-stamp this as `0.1.<run number>`. |
-| `AUDIOBOOKSHELF_URL` | Base URL of your Audiobookshelf server (e.g. `http://192.168.1.10:13378`). Users log in with their Audiobookshelf credentials. Audiobookshelf `root` and `admin` users get the Bookarr admin role; all others get the requester role. |
+| `BOOKARR_VERSION` | Version label shown in the site banner. CI Docker builds auto-stamp this. |
 | `BOOKARR_DATABASE_URL` | Database URL. Docker default is `sqlite:////data/bookarr.db`. |
+| `BOOKARR_AUTH_MODE` | Authentication backend: `audiobookshelf` (default), `jellyfin`, or `local`. |
+| `AUDIOBOOKSHELF_URL` | Base URL of your Audiobookshelf server. Required when `BOOKARR_AUTH_MODE=audiobookshelf`. `root` and `admin` users get the Bookarr admin role; all others get requester. |
+| `JELLYFIN_URL` | Base URL of your Jellyfin server. Required when `BOOKARR_AUTH_MODE=jellyfin`. Jellyfin administrators get the Bookarr admin role. |
+| `BOOKARR_ADMIN_SEED_PASSWORD` | Local auth only. Password for the `admin` account created automatically on first run when the users table is empty. Change it after first login. |
+| `BOOKARR_AUTO_APPROVE_ALL` | When `true`, all requests (from any user) go straight to Listenarr without waiting for approval. Default: `false`. |
+| `BOOKARR_ADMIN_AUTO_APPROVE` | When `true` (default), admin requests bypass the approval queue. Set to `false` to require approval even for admins. Ignored when `BOOKARR_AUTO_APPROVE_ALL=true`. |
 | `LISTENARR_URL` | Base URL for Listenarr. In Docker this is often `http://listenarr:4545`. |
 | `LISTENARR_TOKEN` | Optional Listenarr API key. Leave blank when local auth is disabled. |
 | `LISTENARR_AUTH_MODE` | Auth style: `bearer`, `x-api-key`, or `query`. Default: `x-api-key`. |

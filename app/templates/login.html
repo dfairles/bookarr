@@ -4,7 +4,13 @@
   <div>
     <p class="eyebrow">Audiobook requests</p>
     <h1>Sign in to Bookarr</h1>
+    {% if auth_mode == "jellyfin" %}
+    <p class="muted">Use your Jellyfin username and password.</p>
+    {% elif auth_mode == "local" %}
+    <p class="muted">Sign in with your Bookarr account.</p>
+    {% else %}
     <p class="muted">Use your Audiobookshelf username and password.</p>
+    {% endif %}
   </div>
   <form class="panel" method="post" action="/login">
     {% if error %}<div class="alert">{{ error }}</div>{% endif %}

@@ -10,13 +10,27 @@
   </form>
 </section>
 
-{% if requests %}
+{% set pending = requests | selectattr("status.value", "equalto", "pending_approval") | list %}
+{% if pending %}
+  <section class="pending-section">
+    <p class="eyebrow">Awaiting approval</p>
+    <div class="request-list">
+      {% for item in pending %}
+        {% include "_request_card.html" %}
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+{% set rest = requests | rejectattr("status.value", "equalto", "pending_approval") | list %}
+{% if rest %}
+  {% if pending %}<p class="eyebrow" style="margin-top:32px">All other requests</p>{% endif %}
   <section class="request-list">
-    {% for item in requests %}
+    {% for item in rest %}
       {% include "_request_card.html" %}
     {% endfor %}
   </section>
-{% else %}
+{% elif not pending %}
   <section class="empty">
     <h2>No requests yet</h2>
     <p>Requester activity will appear here.</p>

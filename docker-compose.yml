@@ -8,7 +8,12 @@ services:
     environment:
       BOOKARR_SECRET_KEY: "change-this-long-random-string"
       BOOKARR_DATABASE_URL: "sqlite:////data/bookarr.db"
+      BOOKARR_AUTH_MODE: "audiobookshelf"
       AUDIOBOOKSHELF_URL: "http://your-audiobookshelf-host:13378"
+      JELLYFIN_URL: ""
+      BOOKARR_ADMIN_SEED_PASSWORD: ""
+      BOOKARR_AUTO_APPROVE_ALL: "false"
+      BOOKARR_ADMIN_AUTO_APPROVE: "true"
       LISTENARR_URL: "http://listenarr:4545"
       LISTENARR_TOKEN: ""
       LISTENARR_AUTH_MODE: "x-api-key"

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import get_settings
@@ -16,9 +16,40 @@ class Base(DeclarativeBase):
 
 
 def init_db() -> None:
-    from app import models
+    from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
+    _seed_admin()
+
+
+def _run_migrations() -> None:
+    with engine.connect() as conn:
+        result = conn.execute(text("PRAGMA table_info(audiobook_requests)"))
+        cols = {row[1] for row in result}
+        if "denied_reason" not in cols:
+            conn.execute(text("ALTER TABLE audiobook_requests ADD COLUMN denied_reason TEXT NOT NULL DEFAULT ''"))
+            conn.commit()
+
+
+def _seed_admin() -> None:
+    if settings.auth_mode.lower() != "local" or not settings.admin_seed_password:
+        return
+    from sqlalchemy import select
+    from app.auth import hash_password
+    from app.models import Role, User
+
+    db = SessionLocal()
+    try:
+        if db.scalar(select(User)) is None:
+            db.add(User(
+                username="admin",
+                hashed_password=hash_password(settings.admin_seed_password),
+                role=Role.admin,
+            ))
+            db.commit()
+    finally:
+        db.close()
 
 
 def db_session():

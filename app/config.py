@@ -5,10 +5,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Bookarr"
-    app_version: str = Field(default="0.2", validation_alias="BOOKARR_VERSION")
+    app_version: str = Field(default="0.3", validation_alias="BOOKARR_VERSION")
     secret_key: str = Field(default="change-me", validation_alias="BOOKARR_SECRET_KEY")
     database_url: str = Field(default="sqlite:////data/bookarr.db", validation_alias="BOOKARR_DATABASE_URL")
+
+    auth_mode: str = Field(default="audiobookshelf", validation_alias="BOOKARR_AUTH_MODE")
     audiobookshelf_url: str = Field(default="", validation_alias="AUDIOBOOKSHELF_URL")
+    jellyfin_url: str = Field(default="", validation_alias="JELLYFIN_URL")
+    admin_seed_password: str = Field(default="", validation_alias="BOOKARR_ADMIN_SEED_PASSWORD")
+    admin_auto_approve: bool = Field(default=True, validation_alias="BOOKARR_ADMIN_AUTO_APPROVE")
+    auto_approve_all: bool = Field(default=False, validation_alias="BOOKARR_AUTO_APPROVE_ALL")
 
     listenarr_url: str = Field(default="http://listenarr:8787", validation_alias="LISTENARR_URL")
     listenarr_token: str = Field(default="", validation_alias="LISTENARR_TOKEN")

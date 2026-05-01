@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Admin · Users</p>
+    <h1>Manage users</h1>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:32px">
+  <h2 style="margin:0 0 16px">Add user</h2>
+  {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/admin/users" class="user-form">
+    <label>
+      Username
+      <input name="username" required placeholder="username">
+    </label>
+    <label>
+      Password
+      <input name="password" type="password" required placeholder="password">
+    </label>
+    <label>
+      Role
+      <select name="role">
+        <option value="requester">Requester</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <button class="primary" type="submit">Add user</button>
+  </form>
+</section>
+
+{% if users %}
+  <section>
+    <p class="eyebrow">Existing users</p>
+    <div class="user-list">
+      {% for u in users %}
+        <div class="user-row">
+          <div class="user-info">
+            <strong>{{ u.username }}</strong>
+            <span class="status status-{{ u.role.value }}">{{ u.role.value }}</span>
+          </div>
+          <div class="user-actions">
+            <form method="post" action="/admin/users/{{ u.id }}/role" class="inline-form">
+              <select name="role">
+                <option value="requester" {% if u.role.value == "requester" %}selected{% endif %}>Requester</option>
+                <option value="admin" {% if u.role.value == "admin" %}selected{% endif %}>Admin</option>
+              </select>
+              <button class="secondary small-button" type="submit">Change role</button>
+            </form>
+            <form method="post" action="/admin/users/{{ u.id }}/password" class="inline-form">
+              <input name="new_password" type="password" placeholder="New password" required>
+              <button class="secondary small-button" type="submit">Reset password</button>
+            </form>
+            <form method="post" action="/admin/users/{{ u.id }}/delete">
+              <button class="danger-button small-button" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
+  <section class="empty">
+    <h2>No users yet</h2>
+    <p>Add the first user above.</p>
+  </section>
+{% endif %}
+{% endblock %}

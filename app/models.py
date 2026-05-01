@@ -17,10 +17,12 @@ class Role(str, Enum):
 
 
 class RequestStatus(str, Enum):
+    pending_approval = "pending_approval"
     sent = "sent"
     downloading = "downloading"
     completed = "completed"
     failed = "failed"
+    denied = "denied"
 
 
 class AudiobookRequest(Base):
@@ -36,5 +38,16 @@ class AudiobookRequest(Base):
     listenarr_id: Mapped[str] = mapped_column(String(255), default="", index=True)
     status: Mapped[RequestStatus] = mapped_column(SqlEnum(RequestStatus), default=RequestStatus.sent, index=True)
     error_message: Mapped[str] = mapped_column(Text, default="")
+    denied_reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    role: Mapped[Role] = mapped_column(SqlEnum(Role), default=Role.requester)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

@@ -16,7 +16,8 @@
         <nav>
           <a href="/">Requests</a>
           <a href="/search">Search</a>
-          {% if user.role == "admin" %}<a href="/admin">Admin</a>{% endif %}
+              {% if user.role == "admin" %}<a href="/admin">Admin</a>{% endif %}
+          {% if user.role == "admin" and auth_mode == "local" %}<a href="/admin/users">Users</a>{% endif %}
           <form method="post" action="/logout">
             <button class="link-button" type="submit">Log out</button>
           </form>
@@ -25,7 +26,7 @@
     </header>
     <section class="site-banner" aria-label="Site banner">
       <div class="site-banner-inner">
-        <span>Fairless Family Book Request</span>
+        <span>Audiobook Requests</span>
         <span class="version">v{{ app_version }}</span>
       </div>
     </section>

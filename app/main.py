@@ -18,11 +18,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth import AuthError, authenticate_audiobookshelf, authenticate_jellyfin, authenticate_local, hash_password
 from app.charts import get_enriched_top_audiobooks
 from app.config import get_settings
 from app.database import SessionLocal, db_session, init_db
 from app.listenarr import ListenarrClient, ListenarrError
-from app.models import AudiobookRequest, RequestStatus, Role, utcnow
+from app.models import AudiobookRequest, RequestStatus, Role, User, utcnow
 
 
 settings = get_settings()
@@ -30,10 +31,16 @@ serializer = URLSafeSerializer(settings.secret_key, salt="bookarr-session")
 
 FLASH_MESSAGES: dict[str, tuple[str, str]] = {
     "requested": ("success", "Your request has been submitted."),
+    "pending": ("info", "Your request is awaiting admin approval."),
     "duplicate": ("info", "You've already requested that audiobook."),
     "polled": ("success", "Statuses refreshed."),
     "poll_error": ("warn", "Statuses refreshed, but some requests could not be checked — see errors below."),
     "deleted": ("success", "Request deleted."),
+    "approved": ("success", "Request approved and sent to Listenarr."),
+    "denied": ("info", "Request denied."),
+    "user_created": ("success", "User created."),
+    "user_deleted": ("success", "User deleted."),
+    "user_updated": ("success", "User updated."),
 }
 
 
@@ -76,6 +83,13 @@ def require_user(request: Request) -> dict[str, str]:
     return user
 
 
+def require_admin(request: Request) -> dict[str, str]:
+    user = require_user(request)
+    if user["role"] != Role.admin.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    return user
+
+
 def render(request: Request, template: str, **context):
     flash_key = request.query_params.get("flash", "")
     flash_type, flash_message = FLASH_MESSAGES.get(flash_key, ("", ""))
@@ -86,6 +100,7 @@ def render(request: Request, template: str, **context):
         {
             "app_name": settings.app_name,
             "app_version": settings.app_version,
+            "auth_mode": settings.auth_mode,
             "user": current_user(request),
             "flash": flash,
             **context,
@@ -140,32 +155,31 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(
     request: Request,
+    db: Annotated[Session, Depends(db_session)],
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
 ):
-    abs_url = settings.audiobookshelf_url.rstrip("/")
-    if not abs_url:
-        return render(request, "login.html", error="Audiobookshelf URL is not configured on this server.")
+    auth_mode = settings.auth_mode.lower()
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(
-                f"{abs_url}/login",
-                json={"username": username, "password": password},
-                headers={"Accept": "application/json"},
-            )
-    except Exception:
-        return render(request, "login.html", error="Could not reach Audiobookshelf — please try again.")
-    if resp.status_code != 200:
-        return render(request, "login.html", error="Invalid username or password.")
-    data = resp.json()
-    abs_user = data.get("user", {})
-    abs_type = abs_user.get("type", "user")
-    role = Role.admin if abs_type in ("root", "admin") else Role.requester
-    user_name = abs_user.get("username") or username
+        if auth_mode == "audiobookshelf":
+            if not settings.audiobookshelf_url:
+                return render(request, "login.html", error="Audiobookshelf URL is not configured on this server.")
+            name, role = await authenticate_audiobookshelf(username, password, settings.audiobookshelf_url)
+        elif auth_mode == "jellyfin":
+            if not settings.jellyfin_url:
+                return render(request, "login.html", error="Jellyfin URL is not configured on this server.")
+            name, role = await authenticate_jellyfin(username, password, settings.jellyfin_url)
+        elif auth_mode == "local":
+            name, role = authenticate_local(username, password, db)
+        else:
+            return render(request, "login.html", error="Unknown authentication mode configured.")
+    except AuthError as exc:
+        return render(request, "login.html", error=str(exc))
+
     response = RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         "bookarr_session",
-        serializer.dumps({"name": user_name, "role": role.value}),
+        serializer.dumps({"name": name, "role": role.value}),
         httponly=True,
         samesite="lax",
         max_age=60 * 60 * 24 * 30,
@@ -248,56 +262,186 @@ async def request_book(
         return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
 
     book = {"source_id": source_id, "title": title, "author": author, "cover_url": cover_url}
-    row = AudiobookRequest(user_name=user["name"], **book, status=RequestStatus.sent)
-    try:
-        async with ListenarrClient(settings) as client:
-            listenarr_response = await client.request_book(book)
-        row.listenarr_id = listenarr_response["listenarr_id"]
-    except ListenarrError as exc:
-        row.status = RequestStatus.failed
-        row.error_message = str(exc)
-    db.add(row)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse("/?flash=requested", status_code=status.HTTP_303_SEE_OTHER)
+    is_admin = user["role"] == Role.admin.value
+    auto_send = settings.auto_approve_all or (is_admin and settings.admin_auto_approve)
+
+    if auto_send:
+        row = AudiobookRequest(user_name=user["name"], **book, status=RequestStatus.sent)
+        try:
+            async with ListenarrClient(settings) as client:
+                listenarr_response = await client.request_book(book)
+            row.listenarr_id = listenarr_response["listenarr_id"]
+        except ListenarrError as exc:
+            row.status = RequestStatus.failed
+            row.error_message = str(exc)
+        db.add(row)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/?flash=requested", status_code=status.HTTP_303_SEE_OTHER)
+    else:
+        row = AudiobookRequest(user_name=user["name"], **book, status=RequestStatus.pending_approval)
+        db.add(row)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/?flash=pending", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/admin")
 async def admin_page(request: Request, db: Annotated[Session, Depends(db_session)]):
-    user = require_user(request)
-    if user["role"] != Role.admin.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    require_admin(request)
     rows = db.scalars(select(AudiobookRequest).order_by(AudiobookRequest.updated_at.desc())).all()
     return render(request, "admin.html", requests=rows)
 
 
 @app.post("/poll")
 async def poll_now(request: Request):
-    user = require_user(request)
-    if user["role"] != Role.admin.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    require_admin(request)
     had_errors = await poll_statuses()
     flash = "poll_error" if had_errors else "polled"
     return RedirectResponse(f"/admin?flash={flash}", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@app.post("/admin/requests/{request_id}/delete")
-async def delete_failed_request(
+@app.post("/admin/requests/{request_id}/approve")
+async def approve_request(
     request: Request,
     request_id: int,
     db: Annotated[Session, Depends(db_session)],
 ):
-    user = require_user(request)
-    if user["role"] != Role.admin.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    require_admin(request)
     row = db.get(AudiobookRequest, request_id)
-    if row and (row.status == RequestStatus.failed or row.error_message):
+    if not row or row.status != RequestStatus.pending_approval:
+        return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
+    book = {"source_id": row.source_id, "title": row.title, "author": row.author, "cover_url": row.cover_url}
+    try:
+        async with ListenarrClient(settings) as client:
+            listenarr_response = await client.request_book(book)
+        row.listenarr_id = listenarr_response["listenarr_id"]
+        row.status = RequestStatus.sent
+        row.error_message = ""
+    except ListenarrError as exc:
+        row.status = RequestStatus.failed
+        row.error_message = str(exc)
+    db.commit()
+    return RedirectResponse("/admin?flash=approved", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/requests/{request_id}/deny")
+async def deny_request(
+    request: Request,
+    request_id: int,
+    db: Annotated[Session, Depends(db_session)],
+    reason: Annotated[str, Form()] = "",
+):
+    require_admin(request)
+    row = db.get(AudiobookRequest, request_id)
+    if not row or row.status != RequestStatus.pending_approval:
+        return RedirectResponse("/admin", status_code=status.HTTP_303_SEE_OTHER)
+    row.status = RequestStatus.denied
+    row.denied_reason = reason.strip()
+    db.commit()
+    return RedirectResponse("/admin?flash=denied", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/requests/{request_id}/delete")
+async def delete_request(
+    request: Request,
+    request_id: int,
+    db: Annotated[Session, Depends(db_session)],
+):
+    require_admin(request)
+    row = db.get(AudiobookRequest, request_id)
+    if row and (row.status in (RequestStatus.failed, RequestStatus.denied) or row.error_message):
         db.delete(row)
         db.commit()
     return RedirectResponse("/admin?flash=deleted", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/admin/users")
+async def admin_users_page(request: Request, db: Annotated[Session, Depends(db_session)]):
+    require_admin(request)
+    if settings.auth_mode.lower() != "local":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    users = db.scalars(select(User).order_by(User.username)).all()
+    return render(request, "admin_users.html", users=users, error="")
+
+
+@app.post("/admin/users")
+async def create_user(
+    request: Request,
+    db: Annotated[Session, Depends(db_session)],
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+    role: Annotated[str, Form()] = "requester",
+):
+    require_admin(request)
+    if settings.auth_mode.lower() != "local":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    user_role = Role.admin if role == "admin" else Role.requester
+    new_user = User(username=username.strip(), hashed_password=hash_password(password), role=user_role)
+    db.add(new_user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        users = db.scalars(select(User).order_by(User.username)).all()
+        return render(request, "admin_users.html", users=users, error="Username already exists.")
+    return RedirectResponse("/admin/users?flash=user_created", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/users/{user_id}/delete")
+async def delete_user(
+    request: Request,
+    user_id: int,
+    db: Annotated[Session, Depends(db_session)],
+):
+    require_admin(request)
+    if settings.auth_mode.lower() != "local":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    row = db.get(User, user_id)
+    if row:
+        db.delete(row)
+        db.commit()
+    return RedirectResponse("/admin/users?flash=user_deleted", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/users/{user_id}/role")
+async def update_user_role(
+    request: Request,
+    user_id: int,
+    db: Annotated[Session, Depends(db_session)],
+    role: Annotated[str, Form()],
+):
+    require_admin(request)
+    if settings.auth_mode.lower() != "local":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    row = db.get(User, user_id)
+    if row:
+        row.role = Role.admin if role == "admin" else Role.requester
+        db.commit()
+    return RedirectResponse("/admin/users?flash=user_updated", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/admin/users/{user_id}/password")
+async def reset_user_password(
+    request: Request,
+    user_id: int,
+    db: Annotated[Session, Depends(db_session)],
+    new_password: Annotated[str, Form()],
+):
+    require_admin(request)
+    if settings.auth_mode.lower() != "local":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    row = db.get(User, user_id)
+    if row:
+        row.hashed_password = hash_password(new_password)
+        db.commit()
+    return RedirectResponse("/admin/users?flash=user_updated", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def request_stmt(user: dict[str, str]):

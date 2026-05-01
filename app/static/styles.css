@@ -11,6 +11,7 @@
   --danger: #ff6b6b;
   --warn: #f5b84b;
   --blue: #60a5fa;
+  --purple: #a78bfa;
 }
 
 * {
@@ -348,6 +349,87 @@ button,
 .status-failed {
   background: rgba(255, 107, 107, 0.16);
   color: var(--danger);
+}
+
+.status-pending_approval {
+  background: rgba(167, 139, 250, 0.16);
+  color: var(--purple);
+}
+
+.status-denied {
+  background: rgba(152, 167, 183, 0.12);
+  color: var(--muted);
+}
+
+.pending-section {
+  margin-bottom: 8px;
+}
+
+.pending-section .eyebrow {
+  color: var(--purple);
+}
+
+.deny-form {
+  display: flex;
+  gap: 6px;
+}
+
+.deny-reason {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 10px;
+  width: 140px;
+}
+
+.small-button {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.user-list {
+  display: grid;
+  gap: 8px;
+}
+
+.user-row {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.user-info {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  min-width: 120px;
+}
+
+.user-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inline-form {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.user-form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
 }
 
 .flash {

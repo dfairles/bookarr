@@ -11,11 +11,23 @@
     <p>{{ item.author }}</p>
     {% if user.role == "admin" %}<p class="muted">Requested by {{ item.user_name }}</p>{% endif %}
     {% if item.error_message %}<p class="error-text">{{ item.error_message }}</p>{% endif %}
+    {% if item.status.value == "denied" and item.denied_reason %}
+      <p class="muted">Reason: {{ item.denied_reason }}</p>
+    {% endif %}
   </div>
   <div class="request-side">
-    <span class="status status-{{ item.status.value }}">{{ item.status.value }}</span>
+    <span class="status status-{{ item.status.value }}">{{ item.status.value | replace("_", " ") }}</span>
     <time>{{ item.updated_at.strftime("%b %-d, %Y") }}</time>
-    {% if user.role == "admin" and (item.status.value == "failed" or item.error_message) %}
+    {% if user.role == "admin" and item.status.value == "pending_approval" %}
+      <form method="post" action="/admin/requests/{{ item.id }}/approve">
+        <button class="primary small-button" type="submit">Approve</button>
+      </form>
+      <form method="post" action="/admin/requests/{{ item.id }}/deny" class="deny-form">
+        <input class="deny-reason" name="reason" placeholder="Reason (optional)">
+        <button class="danger-button small-button" type="submit">Deny</button>
+      </form>
+    {% endif %}
+    {% if user.role == "admin" and (item.status.value == "failed" or item.status.value == "denied" or item.error_message) %}
       <form method="post" action="/admin/requests/{{ item.id }}/delete">
         <button class="danger-button" type="submit">Delete</button>
       </form>
