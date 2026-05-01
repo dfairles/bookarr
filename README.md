@@ -1,3 +1,5 @@
+<img width="989" height="453" alt="image" src="https://github.com/user-attachments/assets/3b0cd106-a345-41b4-a447-5583292ac1a0" />
+
 # Bookarr
 
 Bookarr is a self-hosted audiobook request manager. Users search for audiobooks via Listenarr, submit requests, and track their status. Admins approve requests and manage the queue.
