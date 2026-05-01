@@ -23,7 +23,7 @@ Bookarr is configured with environment variables.
 | --- | --- |
 | `BOOKARR_SECRET_KEY` | Secret used for signed login cookies. Use a long random value. |
 | `BOOKARR_VERSION` | Version label shown in the site banner. Default: `0.1`; CI Docker builds auto-stamp this as `0.1.<run number>`. |
-| `AUDIOBOOKSHELF_URL` | Base URL of your Audiobookshelf server (e.g. `http://192.168.1.20:13378`). Users log in with their Audiobookshelf credentials. Audiobookshelf `root` and `admin` users get the Bookarr admin role; all others get the requester role. |
+| `AUDIOBOOKSHELF_URL` | Base URL of your Audiobookshelf server (e.g. `http://192.168.1.10:13378`). Users log in with their Audiobookshelf credentials. Audiobookshelf `root` and `admin` users get the Bookarr admin role; all others get the requester role. |
 | `BOOKARR_DATABASE_URL` | Database URL. Docker default is `sqlite:////data/bookarr.db`. |
 | `LISTENARR_URL` | Base URL for Listenarr. In Docker this is often `http://listenarr:4545`. |
 | `LISTENARR_TOKEN` | Optional Listenarr API key. Leave blank when local auth is disabled. |
@@ -68,11 +68,11 @@ docker compose up -d --build
 
 Bookarr will be available at `http://localhost:8000`.
 
-## Deploy On Sooner
+## Deploy on a Home Server
 
-Your server is `sooner` at `192.168.1.20`, and Listenarr already runs there in Docker. The simplest setup is to place Bookarr on the same Docker network as Listenarr.
+The simplest setup is to place Bookarr on the same Docker network as Listenarr.
 
-1. SSH into `sooner`.
+1. SSH into your server.
 2. Copy this project to a directory such as `/opt/bookarr`.
 3. Confirm the Docker network used by Listenarr:
 
@@ -89,9 +89,9 @@ docker inspect listenarr --format '{{json .NetworkSettings.Networks}}'
 docker compose up -d --build
 ```
 
-From your LAN, open `http://192.168.1.20:8000`.
+From your LAN, open `http://<your-server-ip>:8000`.
 
-Cloudflare Tunnel can point at `http://bookarr:8000` from the same Docker network, or at `http://192.168.1.20:8000` from the host. We can wire that up in the later Cloudflare session.
+Cloudflare Tunnel can point at `http://bookarr:8000` from the same Docker network, or at `http://<your-server-ip>:8000` from the host.
 
 ## Data
 

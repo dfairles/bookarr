@@ -8,8 +8,8 @@ services:
     environment:
       BOOKARR_SECRET_KEY: "change-this-long-random-string"
       BOOKARR_DATABASE_URL: "sqlite:////data/bookarr.db"
-      AUDIOBOOKSHELF_URL: "http://192.168.1.20:13378"
-      LISTENARR_URL: "http://192.168.1.20:4545"
+      AUDIOBOOKSHELF_URL: "http://your-audiobookshelf-host:13378"
+      LISTENARR_URL: "http://listenarr:4545"
       LISTENARR_TOKEN: ""
       LISTENARR_AUTH_MODE: "x-api-key"
       LISTENARR_API_KEY_NAME: "apikey"
