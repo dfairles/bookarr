@@ -1,109 +1,243 @@
 # Bookarr
 
-Bookarr is a small Python web app for audiobook requests. Users sign in with their Audiobookshelf account, search Listenarr, send requests directly to Listenarr, and track request status.
-
-It is built for a personal self-hosted setup: Audiobookshelf for authentication, SQLite storage, and Docker deployment.
+Bookarr is a self-hosted audiobook request manager. Users search for audiobooks via Listenarr, submit requests, and track their status. Admins approve requests and manage the queue.
 
 ## Features
 
 - Three auth backends: Audiobookshelf, Jellyfin, or local accounts managed in Bookarr
-- Requester and admin roles (derived from your auth server's user type, or set manually for local accounts)
-- Requesters see only their own requests
-- Admins see everyone's requests and can manually refresh statuses
-- Admin approval workflow — requester submissions wait for admin sign-off before being sent to Listenarr
-- Admins can optionally bypass approval for their own requests (`BOOKARR_ADMIN_AUTO_APPROVE`)
-- Search is proxied through Listenarr
-- Status polling keeps local history updated
+- Requester and admin roles derived from your auth server, or set manually for local accounts
+- Admin approval workflow — requester submissions wait for sign-off before being sent to Listenarr
+- Optional auto-approve for all requests or admins only
+- Search proxied through Listenarr with "In Library" status badges
+- Status polling keeps request history up to date
 - Dark, mobile-friendly interface inspired by the `*arr` ecosystem
 
-## Configuration
+---
 
-Bookarr is configured with environment variables.
+## Quick Start (Docker)
 
-| Variable | Purpose |
-| --- | --- |
-| `BOOKARR_SECRET_KEY` | Secret used for signed login cookies. Use a long random value. |
-| `BOOKARR_VERSION` | Version label shown in the site banner. CI Docker builds auto-stamp this. |
-| `BOOKARR_DATABASE_URL` | Database URL. Docker default is `sqlite:////data/bookarr.db`. |
-| `BOOKARR_AUTH_MODE` | Authentication backend: `audiobookshelf` (default), `jellyfin`, or `local`. |
-| `AUDIOBOOKSHELF_URL` | Base URL of your Audiobookshelf server. Required when `BOOKARR_AUTH_MODE=audiobookshelf`. `root` and `admin` users get the Bookarr admin role; all others get requester. |
-| `JELLYFIN_URL` | Base URL of your Jellyfin server. Required when `BOOKARR_AUTH_MODE=jellyfin`. Jellyfin administrators get the Bookarr admin role. |
-| `BOOKARR_ADMIN_SEED_PASSWORD` | Local auth only. Password for the `admin` account created automatically on first run when the users table is empty. Change it after first login. |
-| `BOOKARR_AUTO_APPROVE_ALL` | When `true`, all requests (from any user) go straight to Listenarr without waiting for approval. Default: `false`. |
-| `BOOKARR_ADMIN_AUTO_APPROVE` | When `true` (default), admin requests bypass the approval queue. Set to `false` to require approval even for admins. Ignored when `BOOKARR_AUTO_APPROVE_ALL=true`. |
-| `LISTENARR_URL` | Base URL for Listenarr. In Docker this is often `http://listenarr:4545`. |
-| `LISTENARR_TOKEN` | Optional Listenarr API key. Leave blank when local auth is disabled. |
-| `LISTENARR_AUTH_MODE` | Auth style: `bearer`, `x-api-key`, or `query`. Default: `x-api-key`. |
-| `LISTENARR_API_KEY_NAME` | Query-string key name when `LISTENARR_AUTH_MODE=query`. Default: `apikey`. |
-| `LISTENARR_SEARCH_PATH` | Search endpoint path. Default: `/api/v1/search/intelligent`. |
-| `LISTENARR_SEARCH_QUERY_PARAM` | Search query parameter name. Default: `query`. |
-| `LISTENARR_SEARCH_REGION` | Listenarr metadata/search region. Default: `us`. |
-| `LISTENARR_REQUEST_PATH` | Request endpoint path. Default: `/api/v1/library/add`. |
-| `LISTENARR_ANTIFORGERY_PATH` | Antiforgery token endpoint path. Default: `/api/v1/antiforgery/token`. |
-| `LISTENARR_STATUS_PATH` | Status endpoint path. Use `{listenarr_id}` as the placeholder. |
-| `BOOKARR_STATUS_POLL_SECONDS` | How often Bookarr checks Listenarr for status updates. |
-| `BOOKARR_COMPLETED_RETENTION_DAYS` | How long completed requests remain in Bookarr before cleanup. Default: `30`; set to `0` to disable. |
+The fastest path is to pull the pre-built image and run it with Docker Compose.
 
-The defaults follow Listenarr's versioned API (`/api/v1/...`). The paths remain configurable because self-hosted services and forks can change route names.
+**1. Create a `docker-compose.yml`** — pick the example for your auth setup below, then fill in your values.
 
-## Run Locally
+**2. Start Bookarr:**
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --reload --reload-dir ./app --reload-exclude ".venv/*" --reload-exclude "data/*"
+docker compose up -d
 ```
 
-Then open `http://localhost:8000`.
+Bookarr will be available at `http://localhost:8000` (or whatever port you mapped).
 
-If the reloader still loops because your virtual environment is inside the project folder, run without reload:
+---
 
-```bash
-uvicorn app.main:app
+## Docker Compose Examples
+
+### Audiobookshelf auth
+
+Users log in with their existing Audiobookshelf account. Audiobookshelf `root` and `admin` users become Bookarr admins; all others become requesters.
+
+```yaml
+services:
+  bookarr:
+    image: ghcr.io/dfairles/bookarr:latest
+    container_name: bookarr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      BOOKARR_SECRET_KEY: "change-this-to-a-long-random-string"
+      BOOKARR_AUTH_MODE: "audiobookshelf"
+      AUDIOBOOKSHELF_URL: "http://audiobookshelf:13378"
+      LISTENARR_URL: "http://listenarr:4545"
+      LISTENARR_TOKEN: ""
+    volumes:
+      - bookarr-data:/data
+    networks:
+      - arr
+
+networks:
+  arr:
+    external: true
+
+volumes:
+  bookarr-data:
 ```
 
-## Docker
+### Jellyfin auth
 
-Build and run:
+Users log in with their Jellyfin account. Jellyfin administrators become Bookarr admins.
 
-```bash
-docker compose up -d --build
+```yaml
+services:
+  bookarr:
+    image: ghcr.io/dfairles/bookarr:latest
+    container_name: bookarr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      BOOKARR_SECRET_KEY: "change-this-to-a-long-random-string"
+      BOOKARR_AUTH_MODE: "jellyfin"
+      JELLYFIN_URL: "http://jellyfin:8096"
+      LISTENARR_URL: "http://listenarr:4545"
+      LISTENARR_TOKEN: ""
+    volumes:
+      - bookarr-data:/data
+    networks:
+      - arr
+
+networks:
+  arr:
+    external: true
+
+volumes:
+  bookarr-data:
 ```
 
-Bookarr will be available at `http://localhost:8000`.
+### Local auth
 
-## Deploy on a Home Server
+Bookarr manages its own user accounts. Set `BOOKARR_ADMIN_SEED_PASSWORD` and an `admin` account will be created automatically on first run. Log in, then use **Admin → Users** to add more users.
 
-The simplest setup is to place Bookarr on the same Docker network as Listenarr.
+```yaml
+services:
+  bookarr:
+    image: ghcr.io/dfairles/bookarr:latest
+    container_name: bookarr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      BOOKARR_SECRET_KEY: "change-this-to-a-long-random-string"
+      BOOKARR_AUTH_MODE: "local"
+      BOOKARR_ADMIN_SEED_PASSWORD: "change-this-after-first-login"
+      LISTENARR_URL: "http://listenarr:4545"
+      LISTENARR_TOKEN: ""
+    volumes:
+      - bookarr-data:/data
+    networks:
+      - arr
 
-1. SSH into your server.
-2. Copy this project to a directory such as `/opt/bookarr`.
-3. Confirm the Docker network used by Listenarr:
+networks:
+  arr:
+    external: true
+
+volumes:
+  bookarr-data:
+```
+
+---
+
+## Networking
+
+Bookarr needs to reach Listenarr (and your auth server if using Audiobookshelf or Jellyfin) by hostname. The easiest way is to put Bookarr on the same Docker network.
+
+**Find your existing network:**
 
 ```bash
 docker network ls
 docker inspect listenarr --format '{{json .NetworkSettings.Networks}}'
 ```
 
-4. If Listenarr is on a network named `arr`, the included `docker-compose.yml` can be used as-is. If the network name is different, update the `networks` section.
-5. Set the secret key, `AUDIOBOOKSHELF_URL`, Listenarr URL, token, and endpoint paths in `docker-compose.yml`.
-6. Start Bookarr:
+Replace `arr` in the examples above with the actual network name. If you don't have an existing network, create one:
+
+```bash
+docker network create arr
+```
+
+Then add `arr` (or your chosen name) to every relevant container's `networks:` block.
+
+---
+
+## Configuration Reference
+
+All configuration is via environment variables.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `BOOKARR_SECRET_KEY` | — | **Required.** Secret for signed session cookies. Use a long random value. |
+| `BOOKARR_DATABASE_URL` | `sqlite:////data/bookarr.db` | Database path. The default works with the Docker volume mount. |
+| `BOOKARR_AUTH_MODE` | `audiobookshelf` | Auth backend: `audiobookshelf`, `jellyfin`, or `local`. |
+| `AUDIOBOOKSHELF_URL` | — | Base URL of your Audiobookshelf server. Required when `BOOKARR_AUTH_MODE=audiobookshelf`. |
+| `JELLYFIN_URL` | — | Base URL of your Jellyfin server. Required when `BOOKARR_AUTH_MODE=jellyfin`. |
+| `BOOKARR_ADMIN_SEED_PASSWORD` | — | Local auth only. Password for the auto-created `admin` account on first run. |
+| `BOOKARR_AUTO_APPROVE_ALL` | `false` | When `true`, all requests go straight to Listenarr without approval. |
+| `BOOKARR_ADMIN_AUTO_APPROVE` | `true` | When `true`, admin requests skip the approval queue. Ignored when `BOOKARR_AUTO_APPROVE_ALL=true`. |
+| `LISTENARR_URL` | `http://listenarr:4545` | Base URL for Listenarr. |
+| `LISTENARR_TOKEN` | — | Listenarr API key. Leave blank if auth is disabled. |
+| `LISTENARR_AUTH_MODE` | `x-api-key` | How to send the token: `bearer`, `x-api-key`, or `query`. |
+| `LISTENARR_API_KEY_NAME` | `apikey` | Query parameter name when `LISTENARR_AUTH_MODE=query`. |
+| `LISTENARR_SEARCH_PATH` | `/api/v1/search/intelligent` | Listenarr search endpoint. |
+| `LISTENARR_SEARCH_QUERY_PARAM` | `query` | Search query parameter name. |
+| `LISTENARR_SEARCH_REGION` | `us` | Metadata/search region. |
+| `LISTENARR_REQUEST_PATH` | `/api/v1/library/add` | Request submission endpoint. |
+| `LISTENARR_ANTIFORGERY_PATH` | `/api/v1/antiforgery/token` | Antiforgery token endpoint. |
+| `LISTENARR_STATUS_PATH` | `/api/v1/library/{listenarr_id}` | Status check endpoint. |
+| `BOOKARR_STATUS_POLL_SECONDS` | `300` | How often to poll Listenarr for status updates. |
+| `BOOKARR_COMPLETED_RETENTION_DAYS` | `30` | Days to keep completed requests. Set to `0` to disable cleanup. |
+| `BOOKARR_VERSION` | `0.3` | Version label in the UI. CI builds stamp this automatically. |
+
+---
+
+## Data
+
+The Docker volume `bookarr-data` is mounted at `/data` inside the container. The SQLite database lives there. Removing the container does not remove the volume or your request history. To start fresh:
+
+```bash
+docker compose down -v
+```
+
+---
+
+## Deploy on a Home Server
+
+1. SSH into your server.
+2. Create a directory and write your `docker-compose.yml`:
+
+```bash
+mkdir -p /opt/bookarr && cd /opt/bookarr
+nano docker-compose.yml   # paste and fill in one of the examples above
+```
+
+3. Start Bookarr:
+
+```bash
+docker compose up -d
+```
+
+4. Access it from your LAN at `http://<server-ip>:8000`.
+
+A Cloudflare Tunnel pointing at `http://bookarr:8000` (same Docker network) or `http://<server-ip>:8000` (from the host) works well for external access.
+
+---
+
+## Local Development
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your local values
+uvicorn app.main:app --reload --reload-dir ./app
+```
+
+Then open `http://localhost:8000`.
+
+If the reloader loops because the virtual environment is inside the project folder, run without reload:
+
+```bash
+uvicorn app.main:app
+```
+
+### Build the Docker image locally
 
 ```bash
 docker compose up -d --build
 ```
 
-From your LAN, open `http://<your-server-ip>:8000`.
+---
 
-Cloudflare Tunnel can point at `http://bookarr:8000` from the same Docker network, or at `http://<your-server-ip>:8000` from the host.
-
-## Data
-
-The compose file stores SQLite data in the `bookarr-data` Docker volume. Removing the container will not remove request history. Removing the volume will.
-
-## Notes On Listenarr API Shape
+## Notes on Listenarr API Shape
 
 Bookarr sends request payloads like:
 
@@ -120,4 +254,4 @@ Bookarr sends request payloads like:
 }
 ```
 
-Search results are normalized from common fields such as `asin`, `isbn`, `id`, `title`, `authors`, and `imageUrl`. Status values are mapped into `sent`, `downloading`, `completed`, or `failed`.
+Search results are normalized from common fields (`asin`, `isbn`, `id`, `title`, `authors`, `imageUrl`). Status values are mapped to `pending_approval`, `sent`, `downloading`, `completed`, `failed`, or `denied`.
