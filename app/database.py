@@ -1,3 +1,6 @@
+# Copyright (C) 2024-2026 Bookarr Contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 

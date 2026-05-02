@@ -55,6 +55,21 @@ nav {
   font-weight: 800;
 }
 
+.banner-meta {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.banner-source {
+  color: var(--muted);
+  display: flex;
+}
+
+.banner-source:hover {
+  color: var(--text);
+}
+
 .brand-mark {
   align-items: center;
   background: var(--accent);
