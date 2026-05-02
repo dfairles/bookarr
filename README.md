@@ -55,13 +55,6 @@ services:
       LISTENARR_TOKEN: ""
       # Optional — defaults shown
       LISTENARR_AUTH_MODE: "x-api-key"
-      LISTENARR_API_KEY_NAME: "apikey"
-      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
-      LISTENARR_SEARCH_QUERY_PARAM: "query"
-      LISTENARR_SEARCH_REGION: "us"
-      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
-      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
-      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
       BOOKARR_STATUS_POLL_SECONDS: "300"
       BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
@@ -98,13 +91,6 @@ services:
       LISTENARR_TOKEN: ""
       # Optional — defaults shown
       LISTENARR_AUTH_MODE: "x-api-key"
-      LISTENARR_API_KEY_NAME: "apikey"
-      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
-      LISTENARR_SEARCH_QUERY_PARAM: "query"
-      LISTENARR_SEARCH_REGION: "us"
-      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
-      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
-      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
       BOOKARR_STATUS_POLL_SECONDS: "300"
       BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
@@ -141,13 +127,6 @@ services:
       LISTENARR_TOKEN: ""
       # Optional — defaults shown
       LISTENARR_AUTH_MODE: "x-api-key"
-      LISTENARR_API_KEY_NAME: "apikey"
-      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
-      LISTENARR_SEARCH_QUERY_PARAM: "query"
-      LISTENARR_SEARCH_REGION: "us"
-      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
-      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
-      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
       BOOKARR_STATUS_POLL_SECONDS: "300"
       BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
@@ -203,13 +182,6 @@ All configuration is via environment variables.
 | `LISTENARR_URL` | `http://listenarr:4545` | Base URL for Listenarr. |
 | `LISTENARR_TOKEN` | — | Listenarr API key. Leave blank if auth is disabled. |
 | `LISTENARR_AUTH_MODE` | `x-api-key` | How to send the token: `bearer`, `x-api-key`, or `query`. |
-| `LISTENARR_API_KEY_NAME` | `apikey` | Query parameter name when `LISTENARR_AUTH_MODE=query`. |
-| `LISTENARR_SEARCH_PATH` | `/api/v1/search/intelligent` | Listenarr search endpoint. |
-| `LISTENARR_SEARCH_QUERY_PARAM` | `query` | Search query parameter name. |
-| `LISTENARR_SEARCH_REGION` | `us` | Metadata/search region. |
-| `LISTENARR_REQUEST_PATH` | `/api/v1/library/add` | Request submission endpoint. |
-| `LISTENARR_ANTIFORGERY_PATH` | `/api/v1/antiforgery/token` | Antiforgery token endpoint. |
-| `LISTENARR_STATUS_PATH` | `/api/v1/library/{listenarr_id}` | Status check endpoint. |
 | `BOOKARR_STATUS_POLL_SECONDS` | `300` | How often to poll Listenarr for status updates. |
 | `BOOKARR_COMPLETED_RETENTION_DAYS` | `30` | Days to keep completed requests. Set to `0` to disable cleanup. |
 | `BOOKARR_VERSION` | `0.3` | Version label in the UI. CI builds stamp this automatically. |
@@ -279,6 +251,8 @@ docker compose up -d --build
 
 Bookarr sends request payloads like:
 
+ASIN books:
+
 ```json
 {
   "metadata": {
@@ -291,5 +265,7 @@ Bookarr sends request payloads like:
   "autoSearch": true
 }
 ```
+
+ISBN books send `"isbn": ["978..."]` (an array, as required by the Listenarr schema).
 
 Search results are normalized from common fields (`asin`, `isbn`, `id`, `title`, `authors`, `imageUrl`). Status values are mapped to `pending_approval`, `sent`, `downloading`, `completed`, `failed`, or `denied`.
