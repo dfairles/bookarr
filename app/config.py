@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Bookarr"
-    app_version: str = Field(default="0.3", validation_alias="BOOKARR_VERSION")
+    app_version: str = Field(default="dev", validation_alias="BOOKARR_VERSION")
     secret_key: str = Field(default="change-me", validation_alias="BOOKARR_SECRET_KEY")
     database_url: str = Field(default="sqlite:////data/bookarr.db", validation_alias="BOOKARR_DATABASE_URL")
 
