@@ -29,5 +29,5 @@ jobs:
           context: .
           push: true
           build-args: |
-            BOOKARR_VERSION=0.1.${{ github.run_number }}
+            BOOKARR_VERSION=0.3.${{ github.run_number }}
           tags: ghcr.io/dfairles/bookarr:latest
