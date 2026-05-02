@@ -47,11 +47,23 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Required
       BOOKARR_SECRET_KEY: "change-this-to-a-long-random-string"
       BOOKARR_AUTH_MODE: "audiobookshelf"
       AUDIOBOOKSHELF_URL: "http://audiobookshelf:13378"
       LISTENARR_URL: "http://listenarr:4545"
       LISTENARR_TOKEN: ""
+      # Optional — defaults shown
+      LISTENARR_AUTH_MODE: "x-api-key"
+      LISTENARR_API_KEY_NAME: "apikey"
+      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
+      LISTENARR_SEARCH_QUERY_PARAM: "query"
+      LISTENARR_SEARCH_REGION: "us"
+      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
+      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
+      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
+      BOOKARR_STATUS_POLL_SECONDS: "300"
+      BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
       - bookarr-data:/data
     networks:
@@ -78,11 +90,23 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Required
       BOOKARR_SECRET_KEY: "change-this-to-a-long-random-string"
       BOOKARR_AUTH_MODE: "jellyfin"
       JELLYFIN_URL: "http://jellyfin:8096"
       LISTENARR_URL: "http://listenarr:4545"
       LISTENARR_TOKEN: ""
+      # Optional — defaults shown
+      LISTENARR_AUTH_MODE: "x-api-key"
+      LISTENARR_API_KEY_NAME: "apikey"
+      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
+      LISTENARR_SEARCH_QUERY_PARAM: "query"
+      LISTENARR_SEARCH_REGION: "us"
+      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
+      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
+      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
+      BOOKARR_STATUS_POLL_SECONDS: "300"
+      BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
       - bookarr-data:/data
     networks:
@@ -109,11 +133,23 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Required
       BOOKARR_SECRET_KEY: "change-this-to-a-long-random-string"
       BOOKARR_AUTH_MODE: "local"
       BOOKARR_ADMIN_SEED_PASSWORD: "change-this-after-first-login"
       LISTENARR_URL: "http://listenarr:4545"
       LISTENARR_TOKEN: ""
+      # Optional — defaults shown
+      LISTENARR_AUTH_MODE: "x-api-key"
+      LISTENARR_API_KEY_NAME: "apikey"
+      LISTENARR_SEARCH_PATH: "/api/v1/search/intelligent"
+      LISTENARR_SEARCH_QUERY_PARAM: "query"
+      LISTENARR_SEARCH_REGION: "us"
+      LISTENARR_REQUEST_PATH: "/api/v1/library/add"
+      LISTENARR_ANTIFORGERY_PATH: "/api/v1/antiforgery/token"
+      LISTENARR_STATUS_PATH: "/api/v1/library/{listenarr_id}"
+      BOOKARR_STATUS_POLL_SECONDS: "300"
+      BOOKARR_COMPLETED_RETENTION_DAYS: "30"
     volumes:
       - bookarr-data:/data
     networks:
