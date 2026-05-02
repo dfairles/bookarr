@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     listenarr_api_key_name: str = Field(default="apikey", validation_alias="LISTENARR_API_KEY_NAME")
     listenarr_search_path: str = Field(default="/api/v1/search/intelligent", validation_alias="LISTENARR_SEARCH_PATH")
     listenarr_search_query_param: str = Field(default="query", validation_alias="LISTENARR_SEARCH_QUERY_PARAM")
-    listenarr_search_region: str = Field(default="us", validation_alias="LISTENARR_SEARCH_REGION")
     listenarr_request_path: str = Field(default="/api/v1/library/add", validation_alias="LISTENARR_REQUEST_PATH")
     listenarr_antiforgery_path: str = Field(
         default="/api/v1/antiforgery/token",

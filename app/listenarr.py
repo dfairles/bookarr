@@ -63,8 +63,6 @@ class ListenarrClient:
         both shapes are handled.
         """
         params = {self.settings.listenarr_search_query_param: query}
-        if self.settings.listenarr_search_region:
-            params["region"] = self.settings.listenarr_search_region
         payload = await self._request("GET", self.settings.listenarr_search_path, params=params)
         raw_results = payload.get("results", payload) if isinstance(payload, dict) else payload
         if not isinstance(raw_results, list):
@@ -242,7 +240,7 @@ class ListenarrClient:
             return
         compact_id = clean_id.replace("-", "")
         if len(compact_id) in {10, 13} and compact_id.isdigit():
-            metadata["isbn"] = clean_id
+            metadata["isbn"] = [clean_id]
         elif len(clean_id) == 10 and clean_id.isalnum():
             metadata["asin"] = clean_id
         else:
