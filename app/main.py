@@ -27,8 +27,12 @@ from app.models import AudiobookRequest, RequestStatus, Role, User, utcnow
 
 
 settings = get_settings()
+# Cookies are signed (tamper-evident) but not encrypted — role/username are readable
+# in the browser, but cannot be forged without the secret_key.
 serializer = URLSafeSerializer(settings.secret_key, salt="bookarr-session")
 
+# Flash messages are passed as ?flash=<key> query params after redirects.
+# Unknown keys are silently ignored — the template receives flash=None.
 FLASH_MESSAGES: dict[str, tuple[str, str]] = {
     "requested": ("success", "Your request has been submitted."),
     "pending": ("info", "Your request is awaiting admin approval."),
@@ -62,6 +66,7 @@ app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")
 
 
 def current_user(request: Request) -> dict[str, str] | None:
+    """Return the signed session data, or None if the cookie is absent or tampered."""
     cookie = request.cookies.get("bookarr_session")
     if not cookie:
         return None
@@ -122,6 +127,8 @@ async def healthz():
 
 @app.get("/cover")
 async def cover_proxy(url: str, request: Request):
+    # Proxy cover images so the browser never needs direct access to the Listenarr host.
+    # Only Listenarr-origin and public http(s) URLs are allowed to prevent open-redirect abuse.
     require_user(request)
     if not url:
         raise HTTPException(status_code=400)
@@ -263,6 +270,7 @@ async def request_book(
 
     book = {"source_id": source_id, "title": title, "author": author, "cover_url": cover_url}
     is_admin = user["role"] == Role.admin.value
+    # auto_approve_all bypasses approval for everyone; admin_auto_approve only for admins.
     auto_send = settings.auto_approve_all or (is_admin and settings.admin_auto_approve)
 
     if auto_send:
@@ -445,6 +453,7 @@ async def reset_user_password(
 
 
 def request_stmt(user: dict[str, str]):
+    """Build the dashboard query: admins see all requests, requesters see only their own."""
     stmt = select(AudiobookRequest).order_by(AudiobookRequest.updated_at.desc())
     if user["role"] != Role.admin.value:
         stmt = stmt.where(AudiobookRequest.user_name == user["name"])
@@ -452,6 +461,12 @@ def request_stmt(user: dict[str, str]):
 
 
 async def poll_statuses() -> bool:
+    """Poll Listenarr for the current status of all in-flight requests.
+
+    For rows whose listenarr_id is not yet a numeric library ID (e.g. it's still
+    an ASIN/ISBN from the original request), the ID is first resolved via the
+    library lookup before status is fetched. Returns True if any row errored.
+    """
     db = SessionLocal()
     had_errors = False
     try:

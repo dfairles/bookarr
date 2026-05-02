@@ -14,6 +14,13 @@ class ListenarrError(RuntimeError):
 
 
 class ListenarrClient:
+    """HTTP client for a Listenarr-compatible audiobook backend (e.g. Readarr, Listenarr).
+
+    Auth is injected via `_headers` or `_params` depending on `listenarr_auth_mode`
+    (bearer, x-api-key, or query). POST requests additionally require a CSRF token
+    fetched from `listenarr_antiforgery_path` just before each mutating call.
+    """
+
     def __init__(self, settings: Settings):
         self.settings = settings
         self.base_url = settings.listenarr_url.rstrip("/")
@@ -29,6 +36,7 @@ class ListenarrClient:
         await self.aclose()
 
     def _headers(self) -> dict[str, str]:
+        """Return auth headers; only one auth mode is applied per request."""
         headers = {"Accept": "application/json"}
         auth_mode = self.settings.listenarr_auth_mode.lower()
         if self.settings.listenarr_token and auth_mode == "bearer":
@@ -38,6 +46,7 @@ class ListenarrClient:
         return headers
 
     def _params(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Merge caller params with the query-string API key when auth_mode is 'query'."""
         merged = dict(params or {})
         auth_mode = self.settings.listenarr_auth_mode.lower()
         if self.settings.listenarr_token and auth_mode == "query":
@@ -45,6 +54,11 @@ class ListenarrClient:
         return merged
 
     async def search(self, query: str) -> list[dict[str, str]]:
+        """Search the backend and return normalized results.
+
+        Backends may return either a bare list or a dict with a ``results`` key;
+        both shapes are handled.
+        """
         params = {self.settings.listenarr_search_query_param: query}
         if self.settings.listenarr_search_region:
             params["region"] = self.settings.listenarr_search_region
@@ -55,6 +69,10 @@ class ListenarrClient:
         return [self._normalize_result(item) for item in raw_results if isinstance(item, dict)]
 
     async def request_book(self, book: dict[str, str]) -> dict[str, str]:
+        """Submit a book request and return ``{"listenarr_id": ...}``.
+
+        Falls back to ``source_id`` as the ID if the backend response contains none.
+        """
         payload = {
             "metadata": {
                 "title": book["title"],
@@ -85,6 +103,11 @@ class ListenarrClient:
             return False
 
     async def resolve_library_id(self, source_id: str) -> str:
+        """Look up the backend's internal ID for a book already in the library.
+
+        Routes to the ASIN endpoint for 10-char alphanumeric IDs and to the ISBN
+        endpoint for 10- or 13-digit numeric IDs; returns ``""`` for anything else.
+        """
         clean_id = (source_id or "").strip()
         compact_id = clean_id.replace("-", "")
         if len(clean_id) == 10 and clean_id.isalnum():
@@ -120,6 +143,7 @@ class ListenarrClient:
             raise ListenarrError(f"Could not reach Listenarr: {exc}") from exc
 
     async def _antiforgery_token(self) -> str:
+        """Fetch a fresh CSRF token before every POST; raises if none is found."""
         path = self.settings.listenarr_antiforgery_path
         url = f"{self.base_url}{path if path.startswith('/') else '/' + path}"
         response = await self._client.get(url, headers=self._headers(), params=self._params())
@@ -134,6 +158,7 @@ class ListenarrClient:
         return token
 
     def _extract_antiforgery_token(self, response: httpx.Response) -> str:
+        """Try to find a CSRF token in priority order: body, response headers, cookies."""
         body_token = self._extract_antiforgery_body_token(response)
         if body_token:
             return body_token
@@ -184,6 +209,11 @@ class ListenarrClient:
         return token
 
     def _normalize_result(self, item: dict[str, Any]) -> dict[str, str]:
+        """Map a backend search result to a canonical dict.
+
+        Some backends (e.g. Readarr) nest fields under a ``metadata`` sub-object;
+        this unwraps that before field lookup. Relative cover URLs are made absolute.
+        """
         data = item.get("metadata") if isinstance(item.get("metadata"), dict) else item
         source_id = self._first_value(data, ["asin", "isbn", "id", "bookId", "foreignId", "goodreadsId", "titleSlug"])
         title = self._first_value(data, ["title", "bookTitle", "name"])
@@ -203,6 +233,7 @@ class ListenarrClient:
         }
 
     def _attach_external_id(self, metadata: dict[str, Any], source_id: str) -> None:
+        """Set the correct ID field on a request payload based on the ID's format."""
         clean_id = (source_id or "").strip()
         if not clean_id:
             return

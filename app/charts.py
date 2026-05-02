@@ -12,6 +12,10 @@ from app.models import utcnow
 _FEED_URL = "https://itunes.apple.com/us/rss/topaudiobooks/limit=10/json"
 _CACHE_TTL = timedelta(hours=12)
 
+# Two independent module-level caches with the same TTL:
+# _cache holds the raw iTunes chart (title/author/cover only).
+# _enriched_cache holds the same data plus a source_id resolved via Listenarr search.
+# Keeping them separate means a cold enrichment pass doesn't invalidate the raw feed.
 _cache: list[dict[str, str]] = []
 _cache_at: datetime | None = None
 
@@ -22,6 +26,12 @@ SearchFn = Callable[[str], Coroutine[Any, Any, list[dict[str, str]]]]
 
 
 async def get_top_audiobooks() -> list[dict[str, str]]:
+    """Fetch the iTunes top-audiobooks RSS feed and return normalized entries.
+
+    On network or parse failure, the stale cache is returned silently rather than
+    surfacing an error to the user. Returns [] only on the very first call if the
+    feed has never loaded. Cover URLs are upscaled from 170x170 to 300x300.
+    """
     global _cache, _cache_at
     now = utcnow()
     if _cache and _cache_at and (now - _cache_at) < _CACHE_TTL:
@@ -58,6 +68,7 @@ async def get_enriched_top_audiobooks(search_fn: SearchFn) -> list[dict[str, str
         return []
 
     async def _enrich(book: dict[str, str]) -> dict[str, str]:
+        # Failures are swallowed per-book so one bad search doesn't block the rest.
         try:
             results = await search_fn(f"{book['title']} {book['author']}")
             if results:

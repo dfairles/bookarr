@@ -24,6 +24,8 @@ def init_db() -> None:
 
 
 def _run_migrations() -> None:
+    # Lightweight hand-rolled migrations via PRAGMA instead of Alembic — keeps the
+    # deployment dependency-free. Add new columns here as the schema evolves.
     with engine.connect() as conn:
         result = conn.execute(text("PRAGMA table_info(audiobook_requests)"))
         cols = {row[1] for row in result}
@@ -33,6 +35,11 @@ def _run_migrations() -> None:
 
 
 def _seed_admin() -> None:
+    """Create an initial admin user if local auth is enabled and the user table is empty.
+
+    Idempotent: does nothing if any user already exists, so it's safe to run on every
+    startup without risk of overwriting a changed password.
+    """
     if settings.auth_mode.lower() != "local" or not settings.admin_seed_password:
         return
     from sqlalchemy import select
@@ -53,6 +60,7 @@ def _seed_admin() -> None:
 
 
 def db_session():
+    """FastAPI dependency that provides a per-request SQLAlchemy session."""
     db = SessionLocal()
     try:
         yield db
