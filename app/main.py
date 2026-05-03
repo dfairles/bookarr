@@ -141,7 +141,7 @@ async def cover_proxy(url: str, request: Request):
         raise HTTPException(status_code=400)
     auth_mode = settings.listenarr_auth_mode.lower()
     headers: dict[str, str] = {}
-    if settings.listenarr_token:
+    if settings.listenarr_token and url.startswith(listenarr_base):
         if auth_mode == "bearer":
             headers["Authorization"] = f"Bearer {settings.listenarr_token}"
         elif auth_mode == "x-api-key":
@@ -233,16 +233,19 @@ async def search_page(request: Request, q: str = "", db: Annotated[Session, Depe
             ).all()
         )
     else:
-        async with ListenarrClient(settings) as client:
-            top_books = await get_enriched_top_audiobooks(client.search)
-            chart_source_ids = [b.get("source_id", "") for b in top_books]
-            checks = await asyncio.gather(
-                *[client.in_library(sid) for sid in chart_source_ids],
-                return_exceptions=True,
-            )
-        in_library_ids = {
-            sid for sid, hit in zip(chart_source_ids, checks) if hit is True
-        }
+        try:
+            async with ListenarrClient(settings) as client:
+                top_books = await get_enriched_top_audiobooks(client.search)
+                chart_source_ids = [b.get("source_id", "") for b in top_books]
+                checks = await asyncio.gather(
+                    *[client.in_library(sid) for sid in chart_source_ids],
+                    return_exceptions=True,
+                )
+            in_library_ids = {
+                sid for sid, hit in zip(chart_source_ids, checks) if hit is True
+            }
+        except ListenarrError as exc:
+            error = str(exc)
         user_source_ids = set(
             db.scalars(
                 select(AudiobookRequest.source_id).where(AudiobookRequest.user_name == user["name"])

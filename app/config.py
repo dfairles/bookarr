@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from functools import lru_cache
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     completed_retention_days: int = Field(default=30, validation_alias="BOOKARR_COMPLETED_RETENTION_DAYS")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def require_strong_secret_key(self) -> "Settings":
+        if self.secret_key == "change-me":
+            raise ValueError(
+                "BOOKARR_SECRET_KEY must be set to a strong, unique value — "
+                "the default 'change-me' allows session forgery."
+            )
+        return self
 
 
 @lru_cache
