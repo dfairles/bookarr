@@ -186,7 +186,7 @@ All configuration is via environment variables.
 | `BOOKARR_STATUS_POLL_SECONDS` | `300` | How often to poll Listenarr for status updates. |
 | `BOOKARR_COMPLETED_RETENTION_DAYS` | `30` | Days to keep completed requests. Set to `0` to disable cleanup. |
 | `BOOKARR_DISCORD_WEBHOOK_URL` | — | Discord webhook URL for new-request notifications. Can also be set from **Admin → Settings** in the UI (UI value takes precedence). |
-| `BOOKARR_VERSION` | `0.3` | Version label in the UI. CI builds stamp this automatically. |
+| `BOOKARR_VERSION` | `0.3.<run>` | Version label in the UI. Stamped automatically by CI as `0.3.<github_run_number>`. |
 
 ---
 
