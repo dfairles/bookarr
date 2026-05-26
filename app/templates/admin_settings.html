@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Admin · Settings</p>
+    <h1>Notifications</h1>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:32px">
+  <h2 style="margin:0 0 8px">Discord webhook</h2>
+  <p style="margin:0 0 16px;color:var(--text-muted,#888)">Paste a Discord webhook URL to receive a notification whenever a user submits a request.</p>
+  <form method="post" action="/admin/settings" class="user-form">
+    <label>
+      Webhook URL
+      <input name="discord_webhook_url" type="url" placeholder="https://discord.com/api/webhooks/…" value="{{ webhook_url }}">
+    </label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="primary" type="submit" name="action" value="save">Save</button>
+      {% if webhook_url %}
+        <button class="secondary" type="submit" name="action" value="test">Send test</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+{% endblock %}

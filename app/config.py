@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     status_poll_seconds: int = Field(default=300, validation_alias="BOOKARR_STATUS_POLL_SECONDS")
     completed_retention_days: int = Field(default=30, validation_alias="BOOKARR_COMPLETED_RETENTION_DAYS")
 
+    discord_webhook_url: str = Field(default="", validation_alias="BOOKARR_DISCORD_WEBHOOK_URL")
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @model_validator(mode="after")

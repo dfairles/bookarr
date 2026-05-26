@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from enum import Enum
 
 from sqlalchemy import DateTime, Enum as SqlEnum, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, Session
 
 from app.database import Base
 
@@ -44,6 +44,26 @@ class AudiobookRequest(Base):
     denied_reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+
+    @classmethod
+    def get(cls, db: Session, key: str, default: str = "") -> str:
+        row = db.get(cls, key)
+        return row.value if row else default
+
+    @classmethod
+    def set(cls, db: Session, key: str, value: str) -> None:
+        row = db.get(cls, key)
+        if row is None:
+            db.add(cls(key=key, value=value))
+        else:
+            row.value = value
 
 
 class User(Base):

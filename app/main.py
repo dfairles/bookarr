@@ -26,7 +26,8 @@ from app.charts import get_enriched_top_audiobooks
 from app.config import get_settings
 from app.database import SessionLocal, db_session, init_db
 from app.listenarr import ListenarrClient, ListenarrError
-from app.models import AudiobookRequest, RequestStatus, Role, User, utcnow
+from app.models import AppSetting, AudiobookRequest, RequestStatus, Role, User, utcnow
+from app.notifications import notify_new_request, send_test_notification
 
 
 settings = get_settings()
@@ -48,6 +49,9 @@ FLASH_MESSAGES: dict[str, tuple[str, str]] = {
     "user_created": ("success", "User created."),
     "user_deleted": ("success", "User deleted."),
     "user_updated": ("success", "User updated."),
+    "settings_saved": ("success", "Settings saved."),
+    "test_sent": ("success", "Test notification sent."),
+    "test_failed": ("warn", "Test notification failed — check the webhook URL."),
 }
 
 
@@ -294,6 +298,10 @@ async def request_book(
         except IntegrityError:
             db.rollback()
             return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
+        asyncio.create_task(notify_new_request(
+            title=title, author=author, cover_url=cover_url,
+            user_name=user["name"], status=row.status.value,
+        ))
         return RedirectResponse("/?flash=requested", status_code=status.HTTP_303_SEE_OTHER)
     else:
         row = AudiobookRequest(user_name=user["name"], **book, status=RequestStatus.pending_approval)
@@ -303,6 +311,10 @@ async def request_book(
         except IntegrityError:
             db.rollback()
             return RedirectResponse("/?flash=duplicate", status_code=status.HTTP_303_SEE_OTHER)
+        asyncio.create_task(notify_new_request(
+            title=title, author=author, cover_url=cover_url,
+            user_name=user["name"], status=row.status.value,
+        ))
         return RedirectResponse("/?flash=pending", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -456,6 +468,32 @@ async def reset_user_password(
         row.hashed_password = hash_password(new_password)
         db.commit()
     return RedirectResponse("/admin/users?flash=user_updated", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/admin/settings")
+async def admin_settings_page(request: Request, db: Annotated[Session, Depends(db_session)]):
+    require_admin(request)
+    webhook_url = AppSetting.get(db, "discord_webhook_url") or settings.discord_webhook_url
+    return render(request, "admin_settings.html", webhook_url=webhook_url)
+
+
+@app.post("/admin/settings")
+async def save_admin_settings(
+    request: Request,
+    db: Annotated[Session, Depends(db_session)],
+    discord_webhook_url: Annotated[str, Form()] = "",
+    action: Annotated[str, Form()] = "save",
+):
+    require_admin(request)
+    url = discord_webhook_url.strip()
+    AppSetting.set(db, "discord_webhook_url", url)
+    db.commit()
+    if action == "test" and url:
+        error = await send_test_notification(url)
+        flash = "test_failed" if error else "test_sent"
+    else:
+        flash = "settings_saved"
+    return RedirectResponse(f"/admin/settings?flash={flash}", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def request_stmt(user: dict[str, str]):

@@ -12,6 +12,7 @@ Bookarr is a self-hosted audiobook request manager. Users search for audiobooks 
 - Optional auto-approve for all requests or admins only
 - Search proxied through Listenarr with "In Library" status badges
 - Status polling keeps request history up to date
+- Discord webhook notifications when a request is submitted, configurable from the admin UI
 - Dark, mobile-friendly interface inspired by the `*arr` ecosystem
 
 ---
@@ -184,6 +185,7 @@ All configuration is via environment variables.
 | `LISTENARR_AUTH_MODE` | `x-api-key` | How to send the token: `bearer`, `x-api-key`, or `query`. |
 | `BOOKARR_STATUS_POLL_SECONDS` | `300` | How often to poll Listenarr for status updates. |
 | `BOOKARR_COMPLETED_RETENTION_DAYS` | `30` | Days to keep completed requests. Set to `0` to disable cleanup. |
+| `BOOKARR_DISCORD_WEBHOOK_URL` | — | Discord webhook URL for new-request notifications. Can also be set from **Admin → Settings** in the UI (UI value takes precedence). |
 | `BOOKARR_VERSION` | `0.3` | Version label in the UI. CI builds stamp this automatically. |
 
 ---

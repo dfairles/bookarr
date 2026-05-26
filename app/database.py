@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
 
 
 def init_db() -> None:
-    from app import models  # noqa: F401
+    from app import models  # noqa: F401 (registers AppSetting, AudiobookRequest, User with Base)
 
     Base.metadata.create_all(bind=engine)
     _run_migrations()
