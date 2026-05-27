@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
 
 import httpx
 from datetime import datetime, timedelta, timezone
@@ -141,16 +140,6 @@ async def cover_proxy(url: str, request: Request):
     if not url:
         raise HTTPException(status_code=400)
     listenarr_base = settings.listenarr_url.rstrip("/")
-    # Rewrite URLs where Listenarr returned its LAN IP instead of its Docker hostname.
-    # The stored URL and the configured LISTENARR_URL share a port but different netloc.
-    try:
-        up = urlparse(url)
-        bp = urlparse(listenarr_base)
-        if up.port and up.port == bp.port and up.netloc != bp.netloc:
-            path_qs = up.path + (f"?{up.query}" if up.query else "")
-            url = f"{listenarr_base}{path_qs}"
-    except Exception:
-        pass
     allowed_prefixes = (listenarr_base, "https://", "http://")
     if not any(url.startswith(p) for p in allowed_prefixes):
         raise HTTPException(status_code=400)
