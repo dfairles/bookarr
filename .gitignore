@@ -6,3 +6,4 @@ data/
 bookarr-dev.db
 run-dev.sh
 .DS_Store
+LISTENARR_HANDOFF.md
